@@ -151,7 +151,7 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 .hc.set{background:var(--hcol);border-color:var(--hcol);color:var(--bg)}
 .hc.set.lp::after{content:"↻";position:absolute;right:4px;top:1px;font-size:11px}
 .deck.del .hc.set{outline:2px dashed var(--hot);outline-offset:-4px}
-.loops{display:grid;grid-template-columns:48px repeat(6,1fr);gap:6px;align-items:center}
+.loops{display:grid;grid-template-columns:44px repeat(7,1fr);gap:6px;align-items:center}
 .ll{font-family:var(--f-disp);font-size:11px;letter-spacing:.14em;color:var(--muted)}
 .lp{height:46px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font-family:var(--f-mono);font-weight:700;font-size:15px;touch-action:none}
 .lp.on{background:var(--loopln);border-color:var(--loopln);color:var(--bg)}
@@ -198,7 +198,37 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 .hslider .tr{position:absolute;top:calc(50% - 3px);height:6px;left:0;right:0;border-radius:3px;background:linear-gradient(90deg,var(--a-dim),var(--line) 50%,var(--b-dim))}
 .hslider .thumb{top:7px;bottom:7px;height:auto;right:auto;width:34px;left:calc(var(--v,.5) * (100% - 34px))}
 .hslider .thumb::after{left:calc(50% - 1px);right:auto;width:2px;top:5px;bottom:5px;height:auto}
-.pads{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.pads{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.fxr{display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:6px;align-items:center;height:32px}
+.fxr span{font-family:var(--f-disp);font-size:10px;letter-spacing:.14em;color:var(--muted);padding-right:4px}
+.fxr button{height:32px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.fxr button.on{background:var(--fg);border-color:var(--fg);color:var(--bg);font-weight:600}
+.tmx{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0}
+.tch{--c:var(--a);--cd:var(--a-dim);background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:8px;display:grid;
+  grid-template-columns:1fr 50px;grid-template-rows:minmax(0,1fr) 56px;gap:8px;grid-template-areas:'eq fd' 'fl fd';min-height:0;overflow:hidden}
+.tch.b{--c:var(--b);--cd:var(--b-dim);grid-template-columns:50px 1fr;grid-template-areas:'fd eq' 'fd fl'}
+.teq{grid-area:eq;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;min-height:0}
+.tband{display:flex;flex-direction:column;align-items:center;gap:4px;min-height:0}
+.tband b{font-family:var(--f-disp);font-size:10px;letter-spacing:.14em;color:var(--muted)}
+.tval{font-family:var(--f-mono);font-size:11px;height:14px;white-space:nowrap}
+.tband.killed .tval{color:var(--hot)}
+.teqs{width:46px}
+.teqs .thumb{height:26px;top:calc((1 - var(--v,.5)) * (100% - 26px))}
+.fillq{position:absolute;left:calc(50% - 3px);width:6px;border-radius:3px;background:var(--c);
+  top:calc(min(.5,1 - var(--v,.5)) * 100%);height:calc(max(var(--v,.5) - .5,.5 - var(--v,.5)) * 100%)}
+.tband.killed .fillq{display:none} .tband.killed .thumb{border-color:var(--hot)}
+.kb{width:100%;height:38px;border-radius:9px;background:var(--panel3);border:1px solid var(--line);font-family:var(--f-disp);font-weight:700;font-size:11px;letter-spacing:.1em;color:var(--muted);touch-action:none}
+.kb.on{background:var(--hot);border-color:var(--hot);color:var(--bg)}
+.tfd{grid-area:fd;display:flex;flex-direction:column;align-items:center;gap:6px;min-height:0}
+.tfrow{flex:1;display:flex;gap:6px;min-height:0}
+.tch.b .tfrow{flex-direction:row-reverse}
+.tfrow .vslider{flex:0 0 34px}
+.tfilt{grid-area:fl;display:flex;flex-direction:column;justify-content:flex-end;gap:4px}
+.flab{display:flex;justify-content:space-between;font-family:var(--f-disp);font-size:9.5px;letter-spacing:.12em;color:var(--muted)}
+.hslider.tfs{--c:inherit;flex:0 0 40px;height:40px}
+.tch .hslider.tfs .thumb{border-color:var(--c);top:4px;bottom:4px}
+.hslider.tfs .tr{background:linear-gradient(90deg,var(--cd),var(--line) 50%,var(--cd))}
+.hslider.tfs .tr::after{content:"";position:absolute;left:calc(50% - 1px);top:-10px;bottom:-10px;width:2px;background:var(--muted)}
 .pad{height:56px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;touch-action:none}
 .pad b{font-weight:600;font-size:14px}
 .pad small{font-family:var(--f-disp);font-size:9px;letter-spacing:.06em;color:var(--muted);white-space:nowrap}
@@ -240,6 +270,8 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 .srow b{display:block;font-weight:600;font-size:15px}
 .srow span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.5}
 .seg{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.seg.two{grid-template-columns:1fr 1fr}
+.seg.two button{font-family:var(--f-body);font-size:14px}
 .seg button{height:40px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);font-family:var(--f-mono);font-size:13px}
 .seg button.on{background:var(--ok);border-color:var(--ok);color:var(--bg)}
 /* pad mode tabs */
@@ -273,7 +305,7 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v12</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v13</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -287,6 +319,7 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
     <div class="srow"><div><b>터치하면 전체화면</b><span>화면을 터치하면 전체화면으로 바꿔서 주소창이 내려오지 않게 해요. 리모컨 뒤로가기로 빠져나와도 다음 터치에 다시 전체화면이 돼요.</span></div><button class="hb" id="afsBtn">켜짐</button></div>
     <div class="srow"><div><b>가벼운 모드</b><span>파형 해상도를 낮춰 TV에서 더 부드럽게 움직여요. 스탠바이미에서는 처음부터 켜져 있어요.</span></div><button class="hb" id="perfBtn">켜짐</button></div>
     <div class="srow col"><div><b>기기 정보</b><span id="uaInfo"></span></div></div>
+    <div class="srow col"><div><b>믹서 모드</b><span>클래식은 돌리는 노브, 터치는 세로 EQ 슬라이더와 킬 버튼, 가로 필터예요. 두 모드는 같은 값을 써서 바꿔도 소리는 그대로예요.</span></div><div class="seg two" id="mixSeg"><button data-m="classic">클래식</button><button data-m="touch">터치</button></div></div>
     <div class="srow col"><div><b>블루투스 화면 지연 (ms)</b><span>킥 소리가 들리는 순간 빨간 마디선이 가운데 흰 선을 지나가도록 맞추세요.</span></div><div class="seg" id="latSeg"></div></div>
   </div>
 
@@ -390,7 +423,7 @@ const deckHTML=i=>`
       <button class="mini on" id="qz${i}" aria-label="퀀타이즈">Q 스냅</button>
     </div>
     <div class="hots" id="hots${i}">${[0,1,2,3,4,5,6,7].map(k=>`<button class="hc" data-k="${k}">${'ABCDEFGH'[k]}</button>`).join('')}</div>
-    <div class="loops" id="loops${i}"><span class="ll">LOOP</span>${[1,2,4,8,16].map(n=>`<button class="lp" data-n="${n}">${n}</button>`).join('')}<button class="lp ex" data-n="0">OFF</button></div>
+    <div class="loops" id="loops${i}"><span class="ll">LOOP</span>${[1,2,4,8,16,32].map(n=>`<button class="lp" data-n="${n}">${n}</button>`).join('')}<button class="lp ex" data-n="0">OFF</button></div>
     <div class="transport">
       <button class="tbtn cue" id="cue${i}">CUE</button>
       <button class="tbtn play" id="play${i}" aria-label="재생">▶</button>
@@ -403,11 +436,20 @@ const chHTML=i=>`<div class="ch ${i?'b':'a'}">
   <div class="knobs">${knob(i,'hi','HI')}${knob(i,'mid','MID')}${knob(i,'low','LOW')}${knob(i,'filt','FILTER','filt')}</div>
   <div class="frow"><div class="meter"><i></i><u id="met${i}"></u></div><div class="vslider fader" id="vol${i}" tabindex="0" aria-label="${LET[i]} 볼륨"><div class="tr"></div><div class="thumb"></div></div></div>
   <div class="chl">${LET[i]}</div></div>`;
+/* touch mixer: vertical EQ sliders with kill buttons, horizontal filter, channel fader toward the centre */
+const tchHTML=i=>`<div class="tch ${i?'b':'a'}">
+  <div class="teq">${['HI','MID','LOW'].map((k,j)=>`<div class="tband" id="tb${i}${j}"><b>${k}</b><span class="tval" id="tv${i}${j}">0 dB</span><div class="vslider teqs" id="te${i}${j}" tabindex="0" aria-label="${LET[i]} ${k}"><div class="tr"></div><div class="fillq"></div><div class="thumb"></div></div><button class="kb" id="tk${i}${j}" aria-label="${LET[i]} ${k} 킬">${k}</button></div>`).join('')}</div>
+  <div class="tfd"><span class="plab">VOL</span><div class="tfrow"><div class="meter"><i></i><u id="tmet${i}"></u></div><div class="vslider fader" id="tvol${i}" tabindex="0" aria-label="${LET[i]} 볼륨"><div class="tr"></div><div class="thumb"></div></div></div></div>
+  <div class="tfilt"><div class="flab"><span>◀ LOW</span><span>FILTER</span><span>HIGH ▶</span></div><div class="hslider tfs" id="tf${i}" tabindex="0" aria-label="${LET[i]} 필터"><div class="tr"></div><div class="thumb"></div></div></div>
+</div>`;
 $('console').insertAdjacentHTML('beforeend',deckHTML(0)+`
 <section class="mixer">
-  <div class="chs">${chHTML(0)}${chHTML(1)}</div>
+  <div class="chs" id="chsC">${chHTML(0)}${chHTML(1)}</div>
+  <div class="tmx" id="tmx" hidden>${[0,1].map(tchHTML).join('')}</div>
   <div class="xfw"><span class="la">A</span><div class="hslider" id="xf" tabindex="0" aria-label="크로스페이더"><div class="tr"></div><div class="thumb"></div></div><span class="lb">B</span></div>
+  <div class="fxr" id="fxr"><span>FX 보낼 곳</span><button data-t="A">덱 A</button><button data-t="M">A+B</button><button data-t="B">덱 B</button></div>
   <div class="pads">
+    <button class="pad" id="fxClap"><b>핸드클랩</b><small>CLAP</small></button>
     <button class="pad" id="fxHorn"><b>에어혼</b><small>AIR HORN</small></button>
     <button class="pad" id="fxRise"><b>라이저</b><small>RISER</small></button>
     <button class="pad" id="fxDown"><b>다운</b><small>DOWNLIFT</small></button>
@@ -437,8 +479,10 @@ const mkDeck=i=>({i,buffer:null,wave:null,ovc:null,dur:0,grid:null,bpm:null,appr
   offset:0,startedAt:0,playing:false,src:null,pitch:0,bend:0,cue:0,hot:Array(8).fill(null),
   loopOn:false,lin:0,lout:0,q:true,del:false,mode:'hot',roll:null,nodes:null,lvl:0,token:0,ver:0,sync:false,hold:false,snapT:0});
 const decks=[mkDeck(0),mkDeck(1)];
-const mix={eq:[[0,0,0],[0,0,0]],filt:[0,0],vol:[.85,.85],xf:.5};
-let ctx=null,master,comp,echoSend,echoDelay,noiseBuf,mAn,mBins;
+const mix={eq:[[0,0,0],[0,0,0]],kill:[[false,false,false],[false,false,false]],filt:[0,0],vol:[.85,.85],xf:.5};
+let fxTarget='M';
+try{ fxTarget=localStorage.getItem('tdj.fx')||'M'; }catch(e){}
+let ctx=null,master,comp,echoDelay,noiseBuf,mAn,mBins;
 
 function ensureCtx(){
   if(ctx){ if(ctx.state==='suspended') ctx.resume(); return ctx; }
@@ -446,9 +490,9 @@ function ensureCtx(){
   try{ ctx=new AC({latencyHint:'interactive'}); }catch(e){ ctx=new AC(); }
   comp=ctx.createDynamicsCompressor(); comp.threshold.value=-8; comp.ratio.value=4; comp.connect(ctx.destination);
   master=ctx.createGain(); master.gain.value=.9; master.connect(comp);
-  echoSend=ctx.createGain(); echoSend.gain.value=0; echoDelay=ctx.createDelay(2); echoDelay.delayTime.value=.36;
+  echoDelay=ctx.createDelay(2); echoDelay.delayTime.value=.36;
   const fb=ctx.createGain(), ef=ctx.createBiquadFilter(); fb.gain.value=.5; ef.type='highpass'; ef.frequency.value=350;
-  master.connect(echoSend); echoSend.connect(echoDelay); echoDelay.connect(ef); ef.connect(fb); fb.connect(echoDelay); ef.connect(comp);
+  echoDelay.connect(ef); ef.connect(fb); fb.connect(echoDelay); ef.connect(comp);
   noiseBuf=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate); const nd=noiseBuf.getChannelData(0); for(let k=0;k<nd.length;k++) nd[k]=Math.random()*2-1;
   decks.forEach(buildChain); applyMix();
   return ctx;
@@ -458,6 +502,7 @@ function buildChain(d){
   n.lo=bq('lowshelf',220); n.mid=bq('peaking',1100,.8); n.hi=bq('highshelf',3800); n.hp=bq('highpass',20,.9); n.lp=bq('lowpass',20000,.9);
   n.fader=ctx.createGain(); n.xf=ctx.createGain(); n.an=ctx.createAnalyser(); n.an.fftSize=512; n.buf=new Float32Array(512);
   n.lo.connect(n.mid); n.mid.connect(n.hi); n.hi.connect(n.hp); n.hp.connect(n.lp); n.lp.connect(n.fader); n.fader.connect(n.xf); n.xf.connect(master); n.fader.connect(n.an);
+  n.es=ctx.createGain(); n.es.gain.value=0; n.xf.connect(n.es); n.es.connect(echoDelay);
   d.nodes=n;
 }
 const eqDb=v=>v<0?v*26:v*6;
@@ -465,7 +510,8 @@ function applyMix(){
   if(!ctx) return; const t=ctx.currentTime, x=mix.xf;
   const g=[x<=.5?1:Math.cos((x-.5)*Math.PI), x>=.5?1:Math.cos((.5-x)*Math.PI)];
   decks.forEach((d,i)=>{ const n=d.nodes, f=mix.filt[i];
-    n.hi.gain.setTargetAtTime(eqDb(mix.eq[i][0]),t,.01); n.mid.gain.setTargetAtTime(eqDb(mix.eq[i][1]),t,.01); n.lo.gain.setTargetAtTime(eqDb(mix.eq[i][2]),t,.01);
+    const eg=j=>mix.kill[i][j]?-40:eqDb(mix.eq[i][j]);
+    n.hi.gain.setTargetAtTime(eg(0),t,.01); n.mid.gain.setTargetAtTime(eg(1),t,.01); n.lo.gain.setTargetAtTime(eg(2),t,.01);
     n.lp.frequency.setTargetAtTime(f<-.02?20000*Math.pow(180/20000,-f):20000,t,.015);
     n.hp.frequency.setTargetAtTime(f>.02?20*Math.pow(5000/20,f):20,t,.015);
     n.fader.gain.setTargetAtTime(mix.vol[i]*mix.vol[i],t,.01); n.xf.gain.setTargetAtTime(g[i],t,.01); });
@@ -923,6 +969,17 @@ function uiPads(d){
 }
 function uiLoop(d){ d.ver++; $('loops'+d.i).querySelectorAll('.lp').forEach(b=>{ const n=+b.dataset.n; b.classList.toggle('on',d.loopOn&&n>0&&d.loopN===n); }); }
 function uiKnob(el,v){ el.querySelector('.kd').style.setProperty('--r',(v*135)+'deg'); }
+function setEq(i,j,v){ mix.eq[i][j]=v; applyMix(); uiMix(i); }
+function setFilt(i,v){ mix.filt[i]=Math.abs(v)<.03?0:v; applyMix(); uiMix(i); }
+function setVol(i,v){ mix.vol[i]=v; applyMix(); uiMix(i); }
+function uiMix(i){
+  ['hi','mid','low'].forEach((k,j)=>{ const v=mix.eq[i][j], kl=mix.kill[i][j], db=eqDb(v);
+    uiKnob($('k'+i+k),v); $('te'+i+j).style.setProperty('--v',(v+1)/2);
+    $('tb'+i+j).classList.toggle('killed',kl); $('tk'+i+j).classList.toggle('on',kl);
+    $('tv'+i+j).textContent=kl?'KILL':(Math.abs(db)<.5?'0 dB':(db>0?'+':'−')+Math.abs(db).toFixed(0)+' dB'); });
+  uiKnob($('k'+i+'filt'),mix.filt[i]); $('tf'+i).style.setProperty('--v',(mix.filt[i]+1)/2);
+  $('vol'+i).style.setProperty('--v',mix.vol[i]); $('tvol'+i).style.setProperty('--v',mix.vol[i]);
+}
 function tap(el,fn){ el.addEventListener('pointerdown',e=>{ if(e.button>0) return; e.preventDefault(); fn(e); }); el.addEventListener('click',e=>{ if(e.detail===0) fn(e); }); }
 
 /* Drag controls for multi-finger use:
@@ -964,10 +1021,14 @@ function bindDrag(el,o){
 
 /* ================= wire deck & mixer controls ================= */
 decks.forEach((d,i)=>{
-  ['hi','mid','low'].forEach((k,j)=>{ const el=$('k'+i+k); bindDrag(el,{min:-1,max:1,px:150,reset:0,get:()=>mix.eq[i][j],set:v=>{mix.eq[i][j]=v;uiKnob(el,v);applyMix();}}); });
-  const fk=$('k'+i+'filt'); bindDrag(fk,{min:-1,max:1,px:150,reset:0,get:()=>mix.filt[i],set:v=>{mix.filt[i]=Math.abs(v)<.03?0:v;uiKnob(fk,v);applyMix();}});
-  const vol=$('vol'+i); vol.style.setProperty('--v',mix.vol[i]);
-  bindDrag(vol,{min:0,max:1,abs:true,axis:'y',reset:.85,get:()=>mix.vol[i],set:v=>{mix.vol[i]=v;vol.style.setProperty('--v',v);applyMix();}});
+  ['hi','mid','low'].forEach((k,j)=>{
+    bindDrag($('k'+i+k),{min:-1,max:1,px:150,reset:0,get:()=>mix.eq[i][j],set:v=>setEq(i,j,v)});
+    bindDrag($('te'+i+j),{min:-1,max:1,abs:true,axis:'y',thumb:26,reset:0,get:()=>mix.eq[i][j],set:v=>setEq(i,j,Math.abs(v)<.05?0:v)});
+    tap($('tk'+i+j),()=>{ ensureCtx(); mix.kill[i][j]=!mix.kill[i][j]; applyMix(); uiMix(i); }); });
+  bindDrag($('k'+i+'filt'),{min:-1,max:1,px:150,reset:0,get:()=>mix.filt[i],set:v=>setFilt(i,v)});
+  bindDrag($('tf'+i),{min:-1,max:1,abs:true,axis:'x',thumb:30,reset:0,get:()=>mix.filt[i],set:v=>setFilt(i,v)});
+  [$('vol'+i),$('tvol'+i)].forEach(el=>bindDrag(el,{min:0,max:1,abs:true,axis:'y',reset:.85,get:()=>mix.vol[i],set:v=>setVol(i,v)}));
+  uiMix(i);
   bindDrag($('pitch'+i),{min:-PR,max:PR,px:500,reset:0,get:()=>clamp(d.pitch,-PR,PR),set:v=>{
     const o=decks[1-i];
     if(d.sync&&o.bpm){ const np=clamp((1+o.pitch)*(1+v)/(1+d.pitch)-1,-PR,PR); changeRate(o,()=>o.pitch=Math.abs(np)<.002?0:np); uiPitch(o); return; }
@@ -1035,7 +1096,7 @@ tap($('zIn'),()=>{ zoom=Math.max(2,zoom/2); }); tap($('zOut'),()=>{ zoom=Math.mi
 /* ================= FX pads ================= */
 function padFlash(el,ms){ el.classList.add('on'); setTimeout(()=>el.classList.remove('on'),ms); }
 tap($('fxHorn'),()=>{ ensureCtx(); padFlash($('fxHorn'),900);
-  const t=ctx.currentTime+.01, lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2800; const out=ctx.createGain(); out.gain.value=.3; lp.connect(out); out.connect(master);
+  const t=ctx.currentTime+.01, lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2800; const out=ctx.createGain(); out.gain.value=.3; lp.connect(out); out.connect(fxOut());
   [[0,.11],[.14,.25],[.28,.95]].forEach(([a,b])=>[466,470,233].forEach((f,k)=>{ const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.setValueAtTime(f,t+a); o.frequency.linearRampToValueAtTime(f*.97,t+b);
     const g=ctx.createGain(), pk=k===2?.22:.38; g.gain.setValueAtTime(0,t+a); g.gain.linearRampToValueAtTime(pk,t+a+.01); g.gain.setValueAtTime(pk,t+b-.03); g.gain.linearRampToValueAtTime(0,t+b);
     o.connect(g); g.connect(lp); o.start(t+a); o.stop(t+b+.02); })); });
@@ -1043,14 +1104,29 @@ function sweep(f0,f1,len,el){ ensureCtx(); padFlash(el,len*1000);
   const t=ctx.currentTime, s=ctx.createBufferSource(); s.buffer=noiseBuf; s.loop=true;
   const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=4; bp.frequency.setValueAtTime(f0,t); bp.frequency.exponentialRampToValueAtTime(f1,t+len);
   const g=ctx.createGain(); g.gain.setValueAtTime(f0<f1?0:.5,t); g.gain.linearRampToValueAtTime(f0<f1?.5:0,t+len);
-  s.connect(bp); bp.connect(g); g.connect(master); s.start(t); s.stop(t+len+.05); }
+  s.connect(bp); bp.connect(g); g.connect(fxOut()); s.start(t); s.stop(t+len+.05); }
 tap($('fxRise'),()=>sweep(250,9000,4,$('fxRise')));
 tap($('fxDown'),()=>sweep(9000,200,2.2,$('fxDown')));
+/* FX destination: a deck sends the effect through that channel (its EQ, fader and crossfader); A+B goes to the master */
+function fxOut(){ ensureCtx(); return fxTarget==='M'?master:decks[fxTarget==='A'?0:1].nodes.lo; }
+function fxDecks(){ return fxTarget==='M'?decks:[decks[fxTarget==='A'?0:1]]; }
+function uiFx(){ $('fxr').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t===fxTarget)); }
+$('fxr').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; fxTarget=b.dataset.t; try{localStorage.setItem('tdj.fx',fxTarget);}catch(_){} uiFx(); });
+uiFx();
+/* hand clap: three short bursts of band-passed noise 11 ms apart, then a short room tail */
+tap($('fxClap'),()=>{ ensureCtx(); padFlash($('fxClap'),180);
+  const out=fxOut(), t=ctx.currentTime+.005, bp=ctx.createBiquadFilter(), hp=ctx.createBiquadFilter(), g=ctx.createGain();
+  bp.type='bandpass'; bp.frequency.value=1150; bp.Q.value=1.2; hp.type='highpass'; hp.frequency.value=450; g.gain.value=1.1;
+  bp.connect(hp); hp.connect(g); g.connect(out);
+  [0,.011,.022,.033].forEach((o,k)=>{ const s=ctx.createBufferSource(), e=ctx.createGain(), dur=k<3?.012:.16;
+    s.buffer=noiseBuf; e.gain.setValueAtTime(0,t+o); e.gain.linearRampToValueAtTime(k<3?.8:1,t+o+.001); e.gain.exponentialRampToValueAtTime(.001,t+o+dur);
+    s.connect(e); e.connect(bp); s.start(t+o,Math.random()*1.5,dur+.02); }); });
 const echo=$('fxEcho');
 echo.addEventListener('pointerdown',e=>{ e.preventDefault(); ensureCtx(); try{echo.setPointerCapture(e.pointerId);}catch(_){}
-  const d=decks.find(x=>x.playing&&x.bpm)||decks[0], bpm=(d.bpm||124)*(1+d.pitch);
-  echoDelay.delayTime.setValueAtTime(.75*60/bpm,ctx.currentTime); echoSend.gain.setTargetAtTime(.8,ctx.currentTime,.01); echo.classList.add('on'); });
-const echoOff=()=>{ if(!ctx) return; echoSend.gain.setTargetAtTime(0,ctx.currentTime,.02); echo.classList.remove('on'); };
+  const ds=fxDecks(), d=ds.find(x=>x.playing&&x.bpm)||ds[0], bpm=(d.bpm||124)*(1+d.pitch);
+  echoDelay.delayTime.setValueAtTime(.75*60/bpm,ctx.currentTime);
+  decks.forEach(x=>x.nodes.es.gain.setTargetAtTime(ds.includes(x)?.8:0,ctx.currentTime,.01)); echo.classList.add('on'); });
+const echoOff=()=>{ if(!ctx) return; decks.forEach(x=>x.nodes.es.gain.setTargetAtTime(0,ctx.currentTime,.02)); echo.classList.remove('on'); };
 echo.addEventListener('pointerup',echoOff); echo.addEventListener('pointercancel',echoOff);
 
 /* ================= library browser UI ================= */
@@ -1321,6 +1397,17 @@ $('latSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if
 function closeSettings(){ $('sett').hidden=true; $('setBtn').classList.remove('on'); }
 $('setBtn').addEventListener('click',()=>{ const h=!$('sett').hidden; if(h) closeSettings(); else { $('sett').hidden=false; $('setBtn').classList.add('on'); } });
 stage.addEventListener('pointerdown',e=>{ if(!$('sett').hidden&&!e.target.closest('#sett,#setBtn')) closeSettings(); },true);
+let mixMode='classic';
+try{ mixMode=localStorage.getItem('tdj.mix')||'classic'; }catch(e){}
+function setMixMode(m){
+  mixMode=m; try{localStorage.setItem('tdj.mix',m);}catch(e){}
+  const touch=m==='touch'; $('chsC').hidden=touch; $('tmx').hidden=!touch;
+  if(!touch){ mix.kill=[[false,false,false],[false,false,false]]; applyMix(); }
+  els.forEach((E,i)=>{ E.met=$((touch?'tmet':'met')+i); E._l=undefined; uiMix(i); });
+  $('mixSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+}
+$('mixSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setMixMode(b.dataset.m); });
+setMixMode(mixMode);
 uiPerf(); uiLat(); uiSync(); decks.forEach(uiPads);
 /* ================= boot ================= */
 decks.forEach(d=>{ uiPitch(d); uiTransport(d); uiHot(d); });
