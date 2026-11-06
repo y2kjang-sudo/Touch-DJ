@@ -21,7 +21,8 @@
   --f-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
   color-scheme:dark;
 }
-html,body{height:100%;overflow:hidden}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none}
+body{position:fixed;inset:0}
 body{background:var(--bg);color:var(--fg);font-family:var(--f-body)}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -272,7 +273,7 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v10</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v11</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -283,6 +284,7 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
   </header>
   <div class="sett" id="sett" hidden>
     <div class="sh">설정</div>
+    <div class="srow"><div><b>터치하면 전체화면</b><span>화면을 터치하면 전체화면으로 바꿔서 주소창이 내려오지 않게 해요. 리모컨 뒤로가기로 빠져나와도 다음 터치에 다시 전체화면이 돼요.</span></div><button class="hb" id="afsBtn">켜짐</button></div>
     <div class="srow"><div><b>가벼운 모드</b><span>파형 해상도를 낮춰 TV에서 더 부드럽게 움직여요. 스탠바이미에서는 처음부터 켜져 있어요.</span></div><button class="hb" id="perfBtn">켜짐</button></div>
     <div class="srow col"><div><b>기기 정보</b><span id="uaInfo"></span></div></div>
     <div class="srow col"><div><b>블루투스 화면 지연 (ms)</b><span>킥 소리가 들리는 순간 빨간 마디선이 가운데 흰 선을 지나가도록 맞추세요.</span></div><div class="seg" id="latSeg"></div></div>
@@ -1174,8 +1176,22 @@ function markLoaded(){ $('rows').querySelectorAll('.row').forEach(r=>{ const t=s
 $('fs').addEventListener('click',()=>{ const de=document.documentElement;
   if(document.fullscreenElement){ if(document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }
   else if(de.requestFullscreen) de.requestFullscreen().catch(()=>{}); });
-let wl=false;
-document.addEventListener('pointerdown',()=>{ if(!wl&&navigator.wakeLock){ wl=true; navigator.wakeLock.request('screen').catch(()=>{wl=false;}); } },{capture:true});
+let wl=false, AFS=true;
+try{ AFS=localStorage.getItem('tdj.afs')!=='0'; }catch(e){}
+function goFull(){
+  const de=document.documentElement, fe=document.fullscreenElement||document.webkitFullscreenElement;
+  if(fe) return; const rq=de.requestFullscreen||de.webkitRequestFullscreen;
+  if(rq){ try{ const p=rq.call(de,{navigationUI:'hide'}); if(p&&p.catch) p.catch(()=>{}); }catch(e){} }
+}
+document.addEventListener('pointerdown',e=>{
+  if(!wl&&navigator.wakeLock){ wl=true; navigator.wakeLock.request('screen').catch(()=>{wl=false;}); }
+  if(AFS&&!e.target.closest('#fs,#afsBtn,label,input')) goFull();
+},{capture:true});
+// block page-level drags (pull-to-reveal) everywhere except the scrolling lists in the browser panel
+document.addEventListener('touchmove',e=>{ if(!e.target.closest('.rows,.lside')) e.preventDefault(); },{passive:false});
+function uiAfs(){ const b=$('afsBtn'); b.classList.toggle('on',AFS); b.textContent=AFS?'켜짐':'꺼짐'; }
+$('afsBtn').addEventListener('click',()=>{ AFS=!AFS; try{localStorage.setItem('tdj.afs',AFS?'1':'0');}catch(e){} uiAfs(); if(AFS) goFull(); });
+uiAfs();
 stage.addEventListener('contextmenu',e=>e.preventDefault());
 
 /* ================= render loop ================= */
