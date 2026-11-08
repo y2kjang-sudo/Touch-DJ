@@ -25,7 +25,19 @@ LG 스탠바이미 2 같은 가로형 터치 화면에서 브라우저로 돌아
 python3 tools/make_bundles.py /Volumes/USB이름
 ```
 
-USB에 `dj1_rekordbox.tar`(렉박 정보)와 `dj2_music.tar`, `dj3_music.tar`…(음악)가 생겨요. 스탠바이미에서 `USB 불러오기`로 `dj1_rekordbox.tar`를 고르고, `파일 고르기`로 음악 묶음을 차례로 추가하면 돼요. 플레이리스트나 큐만 바꿔서 다시 내보냈다면 `--rekordbox-only`를 붙여 렉박 정보만 다시 만들면 돼요.
+USB에 `dj1_rekordbox.tar`(렉박 정보)와 `dj2_music.tar`, `dj3_music.tar`…(음악)가 생겨요. 스탠바이미에서 `USB 불러오기`로 `dj1_rekordbox.tar`를 고르고, `파일 고르기`로 음악 묶음을 차례로 추가하면 돼요.
+
+렉박에서 다시 내보낸 뒤에는 처음부터 다시 묶을 필요가 없어요.
+
+| 바뀐 것 | 명령 | 하는 일 |
+|---|---|---|
+| 곡을 추가했어요 | `--update` | dj1을 새로 만들고, 아직 묶이지 않은 곡만 새 묶음(예: `dj4_music.tar`)으로 만들어요 |
+| 플레이리스트나 큐만 바꿨어요 | `--rekordbox-only` | dj1만 새로 만들어요 |
+| 곡 파일 자체를 바꿨거나 많이 지웠어요 | (옵션 없이) | 전부 새로 만들어요 |
+
+```
+python3 tools/make_bundles.py /Volumes/USB이름 --update
+```
 
 묶음 파일은 압축이 아니라 파일을 이어 붙인 것이라, 앱이 필요한 곡만 바로 읽어요.
 
