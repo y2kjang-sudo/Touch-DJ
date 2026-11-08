@@ -155,6 +155,13 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 .ll{font-family:var(--f-disp);font-size:11px;letter-spacing:.14em;color:var(--muted)}
 .lp{height:46px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font-family:var(--f-mono);font-weight:700;font-size:15px;touch-action:none}
 .lp.on{background:var(--loopln);border-color:var(--loopln);color:var(--bg)}
+.loops2{display:none;grid-template-columns:44px repeat(7,1fr);gap:6px;align-items:center}
+.digital .loops2{display:grid}
+.lq{height:42px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font-family:var(--f-mono);font-weight:700;font-size:14px;letter-spacing:.06em;touch-action:none}
+.lq.on{background:var(--loopln);border-color:var(--loopln);color:var(--bg)}
+.lq.arm{border-color:var(--loopln);color:var(--loopln)}
+.llen{font-family:var(--f-mono);font-size:13px;text-align:center;color:var(--loopln);white-space:nowrap}
+.digital .hc{height:50px} .digital .lp{height:42px} .digital .tbtn{height:68px}
 .lp.ex{font-family:var(--f-disp);font-size:12px;letter-spacing:.1em;color:var(--muted)}
 
 .transport{display:grid;grid-template-columns:1fr 1.6fr 1fr;gap:8px}
@@ -305,7 +312,7 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v13</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v14</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -319,7 +326,7 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
     <div class="srow"><div><b>터치하면 전체화면</b><span>화면을 터치하면 전체화면으로 바꿔서 주소창이 내려오지 않게 해요. 리모컨 뒤로가기로 빠져나와도 다음 터치에 다시 전체화면이 돼요.</span></div><button class="hb" id="afsBtn">켜짐</button></div>
     <div class="srow"><div><b>가벼운 모드</b><span>파형 해상도를 낮춰 TV에서 더 부드럽게 움직여요. 스탠바이미에서는 처음부터 켜져 있어요.</span></div><button class="hb" id="perfBtn">켜짐</button></div>
     <div class="srow col"><div><b>기기 정보</b><span id="uaInfo"></span></div></div>
-    <div class="srow col"><div><b>믹서 모드</b><span>클래식은 돌리는 노브, 터치는 세로 EQ 슬라이더와 킬 버튼, 가로 필터예요. 두 모드는 같은 값을 써서 바꿔도 소리는 그대로예요.</span></div><div class="seg two" id="mixSeg"><button data-m="classic">클래식</button><button data-m="touch">터치</button></div></div>
+    <div class="srow col"><div><b>믹서 모드</b><span>클래식은 돌리는 노브와 박 단위 루프예요. 디지털은 세로 EQ 슬라이더와 킬 버튼, 가로 필터에, 덱마다 루프 IN·OUT과 길이 조절이 더해져요. 두 모드는 같은 값을 써서 바꿔도 소리는 그대로예요.</span></div><div class="seg two" id="mixSeg"><button data-m="classic">클래식</button><button data-m="touch">디지털</button></div></div>
     <div class="srow col"><div><b>블루투스 화면 지연 (ms)</b><span>킥 소리가 들리는 순간 빨간 마디선이 가운데 흰 선을 지나가도록 맞추세요.</span></div><div class="seg" id="latSeg"></div></div>
   </div>
 
@@ -424,6 +431,7 @@ const deckHTML=i=>`
     </div>
     <div class="hots" id="hots${i}">${[0,1,2,3,4,5,6,7].map(k=>`<button class="hc" data-k="${k}">${'ABCDEFGH'[k]}</button>`).join('')}</div>
     <div class="loops" id="loops${i}"><span class="ll">LOOP</span>${[1,2,4,8,16,32].map(n=>`<button class="lp" data-n="${n}">${n}</button>`).join('')}<button class="lp ex" data-n="0">OFF</button></div>
+    <div class="loops2" id="lp2${i}"><span class="ll">IN·OUT</span><button class="lq" data-a="in">IN</button><button class="lq" data-a="out">OUT</button><button class="lq" data-a="half">÷2</button><span class="llen" id="llen${i}">—</span><button class="lq" data-a="dbl">×2</button><button class="lq" data-a="back">◀</button><button class="lq" data-a="fwd">▶</button></div>
     <div class="transport">
       <button class="tbtn cue" id="cue${i}">CUE</button>
       <button class="tbtn play" id="play${i}" aria-label="재생">▶</button>
@@ -449,7 +457,7 @@ $('console').insertAdjacentHTML('beforeend',deckHTML(0)+`
   <div class="xfw"><span class="la">A</span><div class="hslider" id="xf" tabindex="0" aria-label="크로스페이더"><div class="tr"></div><div class="thumb"></div></div><span class="lb">B</span></div>
   <div class="fxr" id="fxr"><span>FX 보낼 곳</span><button data-t="A">덱 A</button><button data-t="M">A+B</button><button data-t="B">덱 B</button></div>
   <div class="pads">
-    <button class="pad" id="fxClap"><b>핸드클랩</b><small>CLAP</small></button>
+    <button class="pad" id="fxClap"><b>환호</b><small>CROWD</small></button>
     <button class="pad" id="fxHorn"><b>에어혼</b><small>AIR HORN</small></button>
     <button class="pad" id="fxRise"><b>라이저</b><small>RISER</small></button>
     <button class="pad" id="fxDown"><b>다운</b><small>DOWNLIFT</small></button>
@@ -477,7 +485,7 @@ function drawVinyl(cv){
 /* ================= audio engine ================= */
 const mkDeck=i=>({i,buffer:null,wave:null,ovc:null,dur:0,grid:null,bpm:null,approx:false,wrap:false,title:'',artist:'',key:'',track:null,
   offset:0,startedAt:0,playing:false,src:null,pitch:0,bend:0,cue:0,hot:Array(8).fill(null),
-  loopOn:false,lin:0,lout:0,q:true,del:false,mode:'hot',roll:null,nodes:null,lvl:0,token:0,ver:0,sync:false,hold:false,snapT:0});
+  loopOn:false,lin:0,lout:0,pin:null,last:null,q:true,del:false,mode:'hot',roll:null,nodes:null,lvl:0,token:0,ver:0,sync:false,hold:false,snapT:0});
 const decks=[mkDeck(0),mkDeck(1)];
 const mix={eq:[[0,0,0],[0,0,0]],kill:[[false,false,false],[false,false,false]],filt:[0,0],vol:[.85,.85],xf:.5};
 let fxTarget='M';
@@ -596,7 +604,7 @@ function setLoop(d,a,b){
   rebase(d); d.loopOn=true; d.lin=a; d.lout=Math.min(b,d.dur);
   if(d.offset<d.lin||d.offset>=d.lout){ const L=d.lout-d.lin; d.offset=d.lin+(((d.offset-d.lin)%L)+L)%L; if(d.playing){ stopSrc(d); startSrc(d); } }
   else if(d.src){ d.src.loop=true; d.src.loopStart=d.lin; d.src.loopEnd=d.lout; }
-  uiLoop(d);
+  d.last=[d.lin,d.lout]; uiLoop(d);
 }
 function exitLoop(d){ if(!d.loopOn) return; rebase(d); d.loopOn=false; if(d.src){ d.src.loop=d.wrap; d.src.loopStart=0; d.src.loopEnd=0; } uiLoop(d); }
 function beatLoop(d,n){
@@ -935,7 +943,7 @@ async function loadToDeck(i,tr){
       cue=a.mem.length?a.mem.sort((x,y)=>x.t-y.t)[0].t:(grid?grid.t[0]:0);
     }
     if(tok!==d.token) return;
-    Object.assign(d,{buffer:buf,dur:buf.duration,wave:bandWave(buf),ovc:null,grid,bpm,approx,wrap,hot,cue,offset:cue,title:tr.title,artist:tr.artist||'',key:tr.key||'',track:tr,loopOn:false,del:false});
+    Object.assign(d,{pin:null,last:null,buffer:buf,dur:buf.duration,wave:bandWave(buf),ovc:null,grid,bpm,approx,wrap,hot,cue,offset:cue,title:tr.title,artist:tr.artist||'',key:tr.key||'',track:tr,loopOn:false,del:false});
     $('name'+i).textContent=d.title; $('art'+i).textContent=d.artist; $('hubk'+i).textContent=(d.key?d.key+' · ':'')+(d.bpm?Math.round(d.bpm)+' BPM':''); $('lt'+i).textContent=d.title;
     uiPitch(d); uiHot(d); uiLoop(d); uiTransport(d); markLoaded();
   }catch(e){
@@ -967,7 +975,29 @@ function uiPads(d){
     b.classList.toggle('jp',d.mode==='jump'); b.classList.toggle('rl',d.mode==='roll'); b.classList.toggle('on',d.mode==='roll'&&!!d.roll&&d.roll.k===k); });
   $('deck'+d.i).classList.toggle('del',d.del&&hot);
 }
-function uiLoop(d){ d.ver++; $('loops'+d.i).querySelectorAll('.lp').forEach(b=>{ const n=+b.dataset.n; b.classList.toggle('on',d.loopOn&&n>0&&d.loopN===n); }); }
+function loopBeats(d,a,b){ if(!d.grid) return (b-a)/(60/(d.bpm||120)); const i=Math.max(0,beatAt(d,a)); return (b-a)/beatLen(d,i); }
+function fmtBeats(n){ const r=Math.round(n*16)/16; const fr={0.0625:'1/16',0.125:'1/8',0.25:'1/4',0.5:'1/2',0.75:'3/4'}; return (fr[r]||(Math.abs(r-Math.round(r))<.01?String(Math.round(r)):r.toFixed(2)))+'박'; }
+function uiLoop(d){ d.ver++; $('loops'+d.i).querySelectorAll('.lp').forEach(b=>{ const n=+b.dataset.n; b.classList.toggle('on',d.loopOn&&n>0&&d.loopN===n); });
+  const row=$('lp2'+d.i); if(!row) return;
+  row.querySelector('[data-a="in"]').classList.toggle('arm',d.pin!=null);
+  const ob=row.querySelector('[data-a="out"]'); ob.classList.toggle('on',d.loopOn);
+  ob.textContent=d.loopOn?'EXIT':d.pin!=null?'OUT':d.last?'RELOOP':'OUT'; ob.style.fontSize=ob.textContent.length>4?'11px':'';
+  const L=d.loopOn?[d.lin,d.lout]:d.last; $('llen'+d.i).textContent=L?fmtBeats(loopBeats(d,L[0],L[1])):'—'; }
+/* manual loop: IN marks the start, OUT closes and starts the loop; OUT while looping exits; OUT with no mark re-loops the last loop */
+function loopIn(d){ if(!d.buffer) return; ensureCtx(); if(d.loopOn) exitLoop(d); d.pin=snap(d,pos(d)); uiLoop(d); }
+function loopOut(d){
+  if(!d.buffer) return; ensureCtx();
+  if(d.loopOn){ exitLoop(d); return; }
+  if(d.pin!=null){ const p=pos(d); let b=snap(d,p); if(b<=d.pin+.05) b=p; if(b>d.pin+.05){ const a=d.pin; d.pin=null; d.loopN=-1; setLoop(d,a,b); } else { d.pin=null; uiLoop(d); } return; }
+  if(d.last){ d.loopN=-1; seek(d,d.last[0]); setLoop(d,d.last[0],d.last[1]); }
+}
+function loopScale(d,f){
+  const L=d.loopOn?[d.lin,d.lout]:null; if(!L) return; ensureCtx();
+  const len=(L[1]-L[0])*f; if(len<.02||L[0]+len>d.dur) return; d.loopN=-1; setLoop(d,L[0],L[0]+len);
+}
+function loopMove(d,dir){
+  if(!d.loopOn) return; ensureCtx(); const len=d.lout-d.lin; let a=d.lin+dir*len; a=clamp(a,0,d.dur-len); d.loopN=-1; setLoop(d,a,a+len);
+}
 function uiKnob(el,v){ el.querySelector('.kd').style.setProperty('--r',(v*135)+'deg'); }
 function setEq(i,j,v){ mix.eq[i][j]=v; applyMix(); uiMix(i); }
 function setFilt(i,v){ mix.filt[i]=Math.abs(v)<.03?0:v; applyMix(); uiMix(i); }
@@ -1053,6 +1083,7 @@ decks.forEach((d,i)=>{
     if(m==='del') d.del=!d.del; else { if(d.roll) rollEnd(d); d.mode=m; d.del=false; } uiPads(d); });
   tap($('qz'+i),()=>{ d.q=!d.q; $('qz'+i).classList.toggle('on',d.q); });
   $('loops'+i).querySelectorAll('.lp').forEach(b=>tap(b,()=>beatLoop(d,+b.dataset.n)));
+  $('lp2'+i).querySelectorAll('.lq').forEach(b=>tap(b,()=>{ flash(b); ({in:()=>loopIn(d),out:()=>loopOut(d),half:()=>loopScale(d,.5),dbl:()=>loopScale(d,2),back:()=>loopMove(d,-1),fwd:()=>loopMove(d,1)})[b.dataset.a](); }));
   $('ti'+i).addEventListener('click',()=>openLib(i));
 
   /* jog: inner platter scratches, outer ring bends tempo */
@@ -1113,14 +1144,43 @@ function fxDecks(){ return fxTarget==='M'?decks:[decks[fxTarget==='A'?0:1]]; }
 function uiFx(){ $('fxr').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t===fxTarget)); }
 $('fxr').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; fxTarget=b.dataset.t; try{localStorage.setItem('tdj.fx',fxTarget);}catch(_){} uiFx(); });
 uiFx();
-/* hand clap: three short bursts of band-passed noise 11 ms apart, then a short room tail */
-tap($('fxClap'),()=>{ ensureCtx(); padFlash($('fxClap'),180);
-  const out=fxOut(), t=ctx.currentTime+.005, bp=ctx.createBiquadFilter(), hp=ctx.createBiquadFilter(), g=ctx.createGain();
-  bp.type='bandpass'; bp.frequency.value=1150; bp.Q.value=1.2; hp.type='highpass'; hp.frequency.value=450; g.gain.value=1.1;
-  bp.connect(hp); hp.connect(g); g.connect(out);
-  [0,.011,.022,.033].forEach((o,k)=>{ const s=ctx.createBufferSource(), e=ctx.createGain(), dur=k<3?.012:.16;
-    s.buffer=noiseBuf; e.gain.setValueAtTime(0,t+o); e.gain.linearRampToValueAtTime(k<3?.8:1,t+o+.001); e.gain.exponentialRampToValueAtTime(.001,t+o+dur);
-    s.connect(e); e.connect(bp); s.start(t+o,Math.random()*1.5,dur+.02); }); });
+/* crowd cheer: ~4 s of many people clapping (random resonant noise bursts, density swells and fades)
+   plus a dozen 'woo' voices gliding up through vowel formants and a broadband crowd roar; rendered once, then replayed */
+let crowdBuf=null, crowdJob=null;
+function renderCrowd(){
+  if(crowdJob) return crowdJob;
+  const sr=44100, D=4.6, N=Math.floor(sr*D), oc=new OfflineAudioContext(2,N,sr);
+  const ab=oc.createBuffer(2,N,sr), L=ab.getChannelData(0), Rt=ab.getChannelData(1);
+  const dens=t=>t<.35?t/.35:t<2.4?1:Math.max(0,1-(t-2.4)/2);
+  for(let t=0;t<D-.3;){
+    t+=-Math.log(1-Math.random())/(85*dens(t)+1); const dn=dens(t); if(Math.random()>dn+.02) continue;
+    const s0=Math.floor(t*sr), len=Math.floor(sr*(.004+Math.random()*.01)), pan=Math.random(), gn=(.3+Math.random()*.7)*dn;
+    const w=2*Math.PI*(800+Math.random()*1700)/sr, r=.9, a1=2*r*Math.cos(w), a2=-r*r; let y1=0,y2=0;
+    for(let j=0;j<len*4&&s0+j<N;j++){ const x=j<len?(Math.random()*2-1)*Math.exp(-j/(len*.3)):0, y=x+a1*y1+a2*y2; y2=y1; y1=y; const v=y*gn*.12; L[s0+j]+=v*(1-pan); Rt[s0+j]+=v*pan; }
+  }
+  const cl=oc.createBufferSource(); cl.buffer=ab; cl.connect(oc.destination); cl.start(0);
+  for(let k=0;k<12;k++){
+    const st=.15+Math.random()*.7, en=Math.min(D-.05,st+1.8+Math.random()*1.6), f0=180+Math.random()*240, pk=.035+Math.random()*.03;
+    const o=oc.createOscillator(); o.type='sawtooth';
+    o.frequency.setValueAtTime(f0*.8,st); o.frequency.linearRampToValueAtTime(f0*1.3,st+.45); o.frequency.linearRampToValueAtTime(f0*1.05,en);
+    const vb=oc.createOscillator(), vg=oc.createGain(); vb.frequency.value=4.5+Math.random()*2.5; vg.gain.value=f0*.035; vb.connect(vg); vg.connect(o.frequency);
+    const f1=oc.createBiquadFilter(), f2=oc.createBiquadFilter(); f1.type=f2.type='bandpass'; f1.Q.value=5; f2.Q.value=7;
+    f1.frequency.setValueAtTime(330,st); f1.frequency.linearRampToValueAtTime(760,st+.55); f2.frequency.setValueAtTime(870,st); f2.frequency.linearRampToValueAtTime(1250,st+.55);
+    const g=oc.createGain(); g.gain.setValueAtTime(0,st); g.gain.linearRampToValueAtTime(pk,st+.3); g.gain.setValueAtTime(pk,Math.max(st+.31,en-.7)); g.gain.linearRampToValueAtTime(0,en);
+    const p=oc.createStereoPanner(); p.pan.value=Math.random()*1.6-.8;
+    o.connect(f1); o.connect(f2); f1.connect(g); f2.connect(g); g.connect(p); p.connect(oc.destination); o.start(st); vb.start(st); o.stop(en); vb.stop(en);
+  }
+  const nb=oc.createBuffer(2,N,sr); for(let c=0;c<2;c++){ const d=nb.getChannelData(c); for(let j=0;j<N;j++) d[j]=Math.random()*2-1; }
+  const ns=oc.createBufferSource(), nf=oc.createBiquadFilter(), ng=oc.createGain(); ns.buffer=nb; nf.type='bandpass'; nf.frequency.value=1200; nf.Q.value=.6;
+  ng.gain.setValueAtTime(0,0); ng.gain.linearRampToValueAtTime(.05,.5); ng.gain.setValueAtTime(.05,2.3); ng.gain.linearRampToValueAtTime(0,D);
+  ns.connect(nf); nf.connect(ng); ng.connect(oc.destination); ns.start(0);
+  crowdJob=oc.startRendering().then(buf=>{ let m=0; for(let c=0;c<2;c++){ const d=buf.getChannelData(c); for(let j=0;j<d.length;j++){ const a=Math.abs(d[j]); if(a>m) m=a; } }
+    const k=m?.8/m:1; for(let c=0;c<2;c++){ const d=buf.getChannelData(c); for(let j=0;j<d.length;j++) d[j]*=k; } crowdBuf=buf; return buf; });
+  return crowdJob;
+}
+document.addEventListener('pointerdown',()=>{ if(ctx&&!crowdJob) setTimeout(renderCrowd,400); },{capture:true});
+tap($('fxClap'),()=>{ ensureCtx(); const btn=$('fxClap'), out=fxOut();
+  renderCrowd().then(buf=>{ const s=ctx.createBufferSource(), g=ctx.createGain(); s.buffer=buf; g.gain.value=.9; s.connect(g); g.connect(out); s.start(); padFlash(btn,buf.duration*1000); }); });
 const echo=$('fxEcho');
 echo.addEventListener('pointerdown',e=>{ e.preventDefault(); ensureCtx(); try{echo.setPointerCapture(e.pointerId);}catch(_){}
   const ds=fxDecks(), d=ds.find(x=>x.playing&&x.bpm)||ds[0], bpm=(d.bpm||124)*(1+d.pitch);
@@ -1302,6 +1362,7 @@ const strips=[0,1].map(i=>({el:$('w'+i),cache:new Map(),key:'',x:null}));
 function renderTile(d,i,cv,k,ppd,Hd,dpr){
   const TW=TWD; cv.width=TW; cv.height=Hd;
   const g=cv.getContext('2d'), mid=Hd/2, tb=k*TW/ppd, te=(k+1)*TW/ppd, X=t=>(t-tb)*ppd, offs=cyclesFor(d,tb-1,te+1);
+  if(d.pin!=null) offs.forEach(o=>{ const x=X(d.pin+o); if(x<-4*dpr||x>TW+4*dpr) return; g.fillStyle=col.loopln; for(let yy=0;yy<Hd;yy+=8*dpr) g.fillRect(x-dpr,yy,2*dpr,4*dpr); });
   if(d.loopOn) offs.forEach(o=>{ const x1=X(d.lin+o), x2=X(d.lout+o); if(x2<0||x1>TW) return; g.fillStyle=col.loopbg; g.fillRect(x1,0,x2-x1,Hd); g.fillStyle=col.loopln; g.fillRect(x1,0,2*dpr,Hd); g.fillRect(x2-2*dpr,0,2*dpr,Hd); });
   if(d.grid){ const gt=d.grid.t, gn=d.grid.n;
     offs.forEach(o=>{ for(let j=Math.max(0,beatAt(d,tb-o));j<gt.length;j++){ const x=X(gt[j]+o); if(x>TW) break; if(x<-2*dpr) continue; g.fillStyle=gn[j]===1?col.bar:col.line; g.fillRect(x,0,(gn[j]===1?2:1)*dpr,Hd); } }); }
@@ -1401,7 +1462,7 @@ let mixMode='classic';
 try{ mixMode=localStorage.getItem('tdj.mix')||'classic'; }catch(e){}
 function setMixMode(m){
   mixMode=m; try{localStorage.setItem('tdj.mix',m);}catch(e){}
-  const touch=m==='touch'; $('chsC').hidden=touch; $('tmx').hidden=!touch;
+  const touch=m==='touch'; $('chsC').hidden=touch; $('tmx').hidden=!touch; document.body.classList.toggle('digital',touch); decks.forEach(uiLoop);
   if(!touch){ mix.kill=[[false,false,false],[false,false,false]]; applyMix(); }
   els.forEach((E,i)=>{ E.met=$((touch?'tmet':'met')+i); E._l=undefined; uiMix(i); });
   $('mixSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
