@@ -8,18 +8,22 @@ export has been quiet for a minute, it updates the bundles and shows a notificat
   touchdj_auto.py                 one check (what the LaunchAgent runs)
   touchdj_auto.py --now /Volumes/X   update that USB right away (also makes bundles on a new USB)
 """
-import os, sys, time, fcntl, subprocess, traceback
+import os, sys, time, fcntl, subprocess, tempfile, traceback
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import make_bundles as mb  # noqa: E402
 
 SETTLE = 60          # seconds without changes before an export counts as finished
-LOG = os.path.join(HERE, 'log.txt')
+LOG = os.path.expanduser('~/Library/Logs/touchdj.log')
+LOCK = os.path.join(tempfile.gettempdir(), 'touchdj.lock')   # not on the USB: FAT32 has no file locks
+SAY = None   # set to print when run from the double-click file, so progress shows in the window
 
 
 def log(msg):
+    if SAY: SAY(msg)
     try:
+        os.makedirs(os.path.dirname(LOG), exist_ok=True)
         if os.path.exists(LOG) and os.path.getsize(LOG) > 1_000_000: os.remove(LOG)
         with open(LOG, 'a') as f: f.write(time.strftime('%Y-%m-%d %H:%M:%S ') + msg + '\n')
     except OSError: pass
@@ -74,10 +78,15 @@ def run(root):
 
 
 def main():
-    lock = open(os.path.join(HERE, '.lock'), 'w')
+    global SAY
+    now = len(sys.argv) > 2 and sys.argv[1] == '--now'
+    lock = open(LOCK, 'w')
     try: fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError: return 0                      # another update is still running
-    if len(sys.argv) > 2 and sys.argv[1] == '--now':
+    except OSError:                               # another update is still running
+        if now: print('이미 다른 업데이트가 진행 중이에요. 알림이 뜰 때까지 기다려 주세요.')
+        return 2 if now else 0
+    if now:
+        SAY = lambda m: print(m.replace('writing ', '쓰는 중: '), flush=True)
         return run(os.path.abspath(sys.argv[2]))
     try: vols = [os.path.join('/Volumes', v) for v in os.listdir('/Volumes')]
     except OSError: return 0

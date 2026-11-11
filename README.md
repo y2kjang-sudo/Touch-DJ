@@ -24,7 +24,13 @@ LG 스탠바이미 2 같은 가로형 터치 화면에서 브라우저로 돌아
 
 **스탠바이미**: TV 브라우저는 폴더를 고를 수 없고, 대부분의 USB(FAT32)는 4GB가 넘는 파일을 담을 수 없어서 USB를 묶음 파일로 만들어 써요. Mac에 자동 업데이트를 한 번만 설치하면, 그다음부터는 렉박에서 USB로 내보내기만 하면 돼요.
 
-Mac 터미널에 한 번 붙여 넣기:
+**더블클릭으로 하기**: `tools/mac`의 `.command` 파일 3개와 `tools`의 파이썬·설치 파일을 USB 맨 위(`.command`)와 `.touchdj` 폴더에 넣어 두면, Mac에서 USB를 열고 더블클릭만 하면 돼요.
+
+- `터치DJ 업데이트.command`: 지금 바로 이 USB 묶음을 업데이트
+- `터치DJ 자동 업데이트 켜기.command`: 한 번 켜 두면 렉박에서 내보낼 때마다 알아서 업데이트
+- `터치DJ 자동 업데이트 끄기.command`: 자동 업데이트 끄기
+
+터미널로 하려면 Mac 터미널에 한 번 붙여 넣기:
 
 ```
 curl -fsSL https://raw.githubusercontent.com/y2kjang-sudo/Touch-DJ/main/tools/install-mac.sh | zsh

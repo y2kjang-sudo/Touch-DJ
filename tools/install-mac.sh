@@ -27,7 +27,8 @@ fi
 
 mkdir -p "$APP" "$HOME/Library/LaunchAgents"
 for f in make_bundles.py touchdj_auto.py; do
-  if ! curl -fsSL "$SRC/$f" -o "$APP/$f.new"; then echo "내려받기 실패: $f (인터넷 연결을 확인해 주세요)"; exit 1; fi
+  if [[ -n "${TOUCHDJ_SRC:-}" ]]; then cp "$TOUCHDJ_SRC/$f" "$APP/$f.new" || exit 1      # from the USB (double-click file)
+  elif ! curl -fsSL "$SRC/$f" -o "$APP/$f.new"; then echo "내려받기 실패: $f (인터넷 연결을 확인해 주세요)"; exit 1; fi
   mv "$APP/$f.new" "$APP/$f"
 done
 
