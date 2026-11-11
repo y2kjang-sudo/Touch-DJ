@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""Touch DJ automatic bundle update for macOS (runs every 30 s from a LaunchAgent).
+
+Looks at every mounted USB that already has dj1_rekordbox.tar. When rekordbox has exported
+to it since the bundles were made (export.pdb is newer than dj1_rekordbox.tar) and the
+export has been quiet for a minute, it updates the bundles and shows a notification.
+
+  touchdj_auto.py                 one check (what the LaunchAgent runs)
+  touchdj_auto.py --now /Volumes/X   update that USB right away (also makes bundles on a new USB)
+"""
+import os, sys, time, fcntl, subprocess, traceback
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import make_bundles as mb  # noqa: E402
+
+SETTLE = 60          # seconds without changes before an export counts as finished
+LOG = os.path.join(HERE, 'log.txt')
+
+
+def log(msg):
+    try:
+        if os.path.exists(LOG) and os.path.getsize(LOG) > 1_000_000: os.remove(LOG)
+        with open(LOG, 'a') as f: f.write(time.strftime('%Y-%m-%d %H:%M:%S ') + msg + '\n')
+    except OSError: pass
+
+
+def notify(text, sub=''):
+    q = lambda s: '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
+    script = 'display notification %s with title "터치 DJ"%s' % (q(text), (' subtitle ' + q(sub)) if sub else '')
+    try: subprocess.run(['osascript', '-e', script], timeout=10)
+    except Exception: pass
+
+
+def mtime(p):
+    try: return os.path.getmtime(p)
+    except OSError: return 0
+
+
+def newest(root):
+    """latest modification under the parts rekordbox writes during an export"""
+    t = max(mtime(os.path.join(root, 'PIONEER', 'rekordbox', f)) for f in ('export.pdb', 'exportExt.pdb', 'exportLibrary.db'))
+    for top in ('PIONEER/USBANLZ', 'Contents'):
+        for d, ds, fs in os.walk(os.path.join(root, top)):
+            t = max([t, mtime(d)] + [mtime(os.path.join(d, f)) for f in fs if not f.startswith('.')])
+    return t
+
+
+def pending(root):
+    pdb = os.path.join(root, 'PIONEER', 'rekordbox', 'export.pdb')
+    dj1 = os.path.join(root, 'dj1_rekordbox.tar')
+    return os.path.isfile(pdb) and os.path.isfile(dj1) and mtime(pdb) > mtime(dj1) + 2
+
+
+def run(root):
+    name = os.path.basename(root.rstrip('/'))
+    notify('USB 묶음을 업데이트하고 있어요. 알림이 끝날 때까지 USB를 빼지 마세요.', name)
+    log('update start ' + root)
+    try:
+        r = mb.update(root, log=log)
+    except BaseException as e:
+        log('update failed ' + root + '\n' + traceback.format_exc())
+        notify('업데이트하지 못했어요: ' + str(e)[:120], name)
+        return 1
+    what = []
+    if r['added']: what.append('새 곡 %d개' % r['added'])
+    if r['changed']: what.append('바뀐 곡 %d개' % r['changed'])
+    what.append('플레이리스트·큐 반영')
+    notify(' · '.join(what) + '. 이제 USB를 빼도 돼요.', name)
+    log('update done %s %s' % (root, r))
+    print('완료: ' + ' · '.join(what))
+    print('TV에서 고를 파일: ' + ', '.join(r['bundles']))
+    return 0
+
+
+def main():
+    lock = open(os.path.join(HERE, '.lock'), 'w')
+    try: fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError: return 0                      # another update is still running
+    if len(sys.argv) > 2 and sys.argv[1] == '--now':
+        return run(os.path.abspath(sys.argv[2]))
+    try: vols = [os.path.join('/Volumes', v) for v in os.listdir('/Volumes')]
+    except OSError: return 0
+    for root in vols:
+        try:
+            if pending(root) and time.time() - newest(root) > SETTLE:
+                run(root)
+        except PermissionError:
+            log('no permission for ' + root + ' (allow removable volumes for python3 in System Settings)')
+        except OSError:
+            pass
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

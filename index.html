@@ -440,7 +440,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v16</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v17</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -914,10 +914,12 @@ function parsePdb(ab){
     while(!seen.has(p)){ seen.add(p); const base=p*lenPage; if(base+lenPage>ab.byteLength) break;
       const ptype=dv.getUint32(base+8,true), next=dv.getUint32(base+12,true), flags=dv.getUint8(base+0x1b);
       if(ptype===type&&(flags&0x40)===0){
-        const small=dv.getUint8(base+0x18), large=dv.getUint16(base+0x22,true), n=(large>small&&large!==0x1fff)?large:small;
+        // bytes 0x18-0x1a pack the row-offset count (low 13 bits) and the live-row count; a page can hold more
+        // than 255 offsets (playlist entries are tiny), so the single byte at 0x18 is not enough on its own
+        const n=(dv.getUint8(base+0x18)|(dv.getUint8(base+0x19)<<8))&0x1fff;
         const groups=n?Math.floor((n-1)/16)+1:0;
         for(let g=0;g<groups;g++){ const gb=base+lenPage-g*0x24, present=dv.getUint16(gb-4,true);
-          for(let j=0;j<16;j++){ if(!((present>>j)&1)) continue; const rp=base+0x28+dv.getUint16(gb-6-2*j,true); try{fn(rp);}catch(e){} } }
+          for(let j=0;j<16&&g*16+j<n;j++){ if(!((present>>j)&1)) continue; const rp=base+0x28+dv.getUint16(gb-6-2*j,true); try{fn(rp);}catch(e){} } }
       }
       if(p===t.last) break; p=next;
     }
@@ -1019,7 +1021,8 @@ async function ingest(fileList){
     try{ const x=await expandTar(joined); x.forEach(f=>f._parts=true); x.meta.parts=ps.map(p=>p.name); lib.tar=x.meta; add=add.concat(x); }
     catch(e){ lib.tar={name:joined.name,size:joined.size,entries:0,pioneer:0,audio:0,cut:true,parts:ps.map(p=>p.name)}; }
   }
-  const tars=add.filter(f=>/\.tar$/i.test(f.name));
+  // bundles in number order (dj2 before dj10), so a song packed again in a later update bundle wins
+  const tars=add.filter(f=>/\.tar$/i.test(f.name)).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
   if(tars.length){ add=add.filter(f=>!/\.tar$/i.test(f.name));
     for(const t of tars){ try{ const x=await expandTar(t); lib.tar=x.meta; add=add.concat(x); }catch(e){ lib.tar={name:t.name,size:t.size,entries:0,pioneer:0,audio:0,cut:true}; } } }
   if(!add.length){ libBusy=false; return; }
@@ -1028,11 +1031,12 @@ async function ingest(fileList){
   const K=x=>String(x||'').normalize('NFC').toLowerCase();
   files.forEach(f=>{ const n=K(f.name); if(!byName.has(n)) byName.set(n,[]); byName.get(n).push(f); byRel.set(K(f.webkitRelativePath||f.name),f); });
   const find=path=>{ if(!path) return null; const pl=K(path.replace(/\\/g,'/')), nm=pl.split('/').pop(), c=byName.get(nm); if(!c) return null;
-    return c.find(f=>('/'+K(f.webkitRelativePath||f.name)).endsWith(pl))||(c.length===1?c[0]:null); };
+    for(let k=c.length-1;k>=0;k--) if(('/'+K(c[k].webkitRelativePath||c[k].name)).endsWith(pl)) return c[k];
+    return c.length===1?c[0]:null; };
   const sibling=(f,ext)=>{ const r=K(f.webkitRelativePath||''); return r?byRel.get(r.replace(/\.dat$/,ext))||null:null; };
   setLibStatus('파일 '+files.length.toLocaleString()+'개 확인 중…');
   const used=new Set(); let tracks=[], playlists=[], kind='files', pdbOK=false;
-  const pdbF=files.find(f=>f.name.toLowerCase()==='export.pdb');
+  const pdbF=files.filter(f=>f.name.toLowerCase()==='export.pdb').pop();   // the newest pick wins
   try{
     if(pdbF){
       const r=parsePdb(await pdbF.arrayBuffer()); kind='rb';
@@ -1070,7 +1074,7 @@ async function ingest(fileList){
   lib.missing=missing;
   const rbT=tracks.filter(t=>t.src==='rb');
   lib.diag={kind,pdbFile:!!pdbF,pdb:pdbOK,plus:!!files.find(f=>f.name.toLowerCase()==='exportlibrary.db'),tracks:tracks.length,rbTracks:rbT.length,
-    playlists:playlists.filter(p=>p.type==='item').length,linked:tracks.filter(t=>t.file).length,missing,anlz:rbT.filter(t=>t.anlz).length,scanned:0,withHot:0,withGrid:0,scanning:true};
+    playlists:playlists.filter(p=>p.type==='item').length,plEntries:playlists.reduce((n,p)=>n+(p.list?p.list.length:0),0),linked:tracks.filter(t=>t.file).length,missing,anlz:rbT.filter(t=>t.anlz).length,scanned:0,withHot:0,withGrid:0,scanning:true};
   scanAnalysis(rbT,lib.diag);
   buildViews(); curView=tracks.length?'all':'demo';
   $('chip').classList.toggle('rb',kind==='rb'); $('chipT').textContent=tracks.length?lib.label:'데모 트랙 2곡';
@@ -1418,7 +1422,7 @@ function renderDiag(){
   if(D.kind==='rb'){
     h.push(chip('export.pdb',D.pdb?'읽음':D.pdbFile?'읽기 실패':'없음',D.pdb?'ok':'bad'));
     h.push(chip('곡',D.tracks.toLocaleString()));
-    h.push(chip('플레이리스트',D.playlists.toLocaleString(),D.playlists?'ok':'warn'));
+    h.push(chip('플레이리스트',D.playlists.toLocaleString()+(D.plEntries?' · 곡 '+D.plEntries.toLocaleString():''),D.playlists?'ok':'warn'));
     h.push(chip('음원 연결',D.linked.toLocaleString()+' / '+D.tracks.toLocaleString(),D.missing?'warn':'ok'));
     h.push(chip('분석 파일',D.anlz.toLocaleString()+' / '+D.rbTracks.toLocaleString(),D.anlz<D.rbTracks?'warn':'ok'));
     h.push(chip('핫큐 있는 곡',D.withHot.toLocaleString()+(D.scanning?' · 확인 중 '+D.scanned+'/'+D.anlz:''),D.scanning?'':D.withHot?'ok':'warn'));
@@ -1426,7 +1430,7 @@ function renderDiag(){
     if(!D.pdb&&D.plus) notes.push('Device Library Plus 형식만 들어 있어요. 렉박 내보내기 설정에서 기존 Device Library도 켜고 다시 내보내면 플레이리스트와 곡 정보까지 읽을 수 있어요.');
     else if(D.pdbFile&&!D.pdb) notes.push('export.pdb를 읽지 못했어요. 분석 파일로 곡 목록을 대신 만들었어요. 이 USB가 어떤 렉박 버전으로 내보낸 건지 알려주시면 고칠게요.');
     else if(!D.pdb) notes.push('export.pdb가 없어서 분석 파일로 곡 목록을 만들었어요. 플레이리스트와 곡 제목은 표시되지 않아요.');
-    if(D.missing) notes.push(T?'음원을 아직 못 찾은 곡이 '+D.missing+'개예요. 음악 묶음 파일(예: dj2_music.tar, dj3_music.tar)을 ‘파일 추가’로 더 골라주세요.':'음원을 못 찾은 곡이 '+D.missing+'개 있어요. USB 맨 위 폴더(PIONEER와 Contents가 함께 있는 곳)를 골라주세요.');
+    if(D.missing) notes.push(T?'음원을 아직 못 찾은 곡이 '+D.missing+'개예요. USB 맨 위의 dj로 시작하는 파일을 모두 골랐는지 확인해 주세요. 다 골랐는데도 남으면 새로 넣은 곡이 아직 묶음에 없는 거예요. Mac에 USB를 꽂아 자동 업데이트 알림이 끝난 뒤 다시 골라주세요.':'음원을 못 찾은 곡이 '+D.missing+'개 있어요. USB 맨 위 폴더(PIONEER와 Contents가 함께 있는 곳)를 골라주세요.');
     if(!D.scanning&&D.anlz&&!D.withHot) notes.push('분석 파일에서 핫큐를 찾지 못했어요. 렉박에서 핫큐를 찍은 뒤 USB를 다시 내보냈는지 확인해 주세요.');
   } else {
     h.push(chip('형식','일반 음악 파일','warn')); h.push(chip('곡',D.tracks.toLocaleString()));
@@ -1454,7 +1458,7 @@ function renderRows(){
   const ref=refDeck(), rb=ref&&ref.bpm?ref.bpm*(1+ref.pitch):0, rk=ref?camelot(ref.key):null;
   list.forEach(t=>{ const c=camOf(t); t._b=!!rb&&bpmOk(t.bpm,rb); t._k=!!rk&&keyOk(c,rk); t._m=!!ref&&t!==ref.track&&t._b&&(t._k||!rk||!c); });
   let dupHidden=0;
-  if(hideDup){ const nk=x=>String(x||'').normalize('NFC').toLowerCase().replace(/\s+/g,' ').trim(), best=new Map();
+  if(hideDup&&!/^pl/.test(v&&v.id||'')){ const nk=x=>String(x||'').normalize('NFC').toLowerCase().replace(/\s+/g,' ').trim(), best=new Map();
     const score=t=>(t.src==='demo'||t.file?1000:0)+(t.plc||0)*10+(t.nHot?5:0)-String(t.file&&t.file.name||'').length/1000;
     list.forEach(t=>{ const k=nk(t.title)+'|'+nk(t.artist), c=best.get(k); if(!c||score(t)>score(c)) best.set(k,t); });
     const keep=new Set(best.values()); dupHidden=list.length-keep.size; if(dupHidden) list=list.filter(t=>keep.has(t)); }
