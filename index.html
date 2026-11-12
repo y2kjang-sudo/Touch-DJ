@@ -271,7 +271,7 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 .deck,.mixer,.wv,.ov,.spec{contain:layout paint}
 .hb.on{border-color:var(--ok);color:var(--ok)}
 /* settings popover */
-.sett{position:absolute;right:14px;top:72px;z-index:9;width:460px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:16px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.sett{position:absolute;right:14px;top:72px;z-index:9;width:460px;max-height:810px;overflow-y:auto;touch-action:pan-y;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:16px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
 .sh{font-family:var(--f-disp);font-weight:700;letter-spacing:.14em;font-size:12px;color:var(--muted)}
 .srow{display:flex;gap:14px;align-items:center;justify-content:space-between}
 .srow.col{flex-direction:column;align-items:stretch}
@@ -307,6 +307,13 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 .dnote{flex-basis:100%;font-size:12.5px;line-height:1.6}
 .dnote::before{content:"! ";color:var(--loopln);font-weight:700}
 .needle .dot{will-change:transform}
+.hph{display:flex;gap:14px;align-items:center;justify-content:space-between}
+.hpbox{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;margin-top:10px}
+.hpq{background:#fff;border-radius:10px;padding:6px;min-width:120px;min-height:120px;display:flex;align-items:center;justify-content:center}
+.hpq span{color:#000;font-size:12px;margin:0} .hpq img{display:block;width:170px;height:170px;image-rendering:pixelated}
+.hpi{display:flex;flex-direction:column;gap:6px;min-width:0}
+.hpi b{font-family:var(--f-mono);font-size:26px;letter-spacing:.12em} .hpi em{font-style:normal;color:var(--fg)}
+.hpu{word-break:break-all;font-size:11px!important}
 
 /* ===== controller skin (html.ctl): hardware look over the same layout.
    Everything here is static paint (gradients and shadows drawn once); during play only the
@@ -440,7 +447,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v17</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v18</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -452,6 +459,9 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
   <div class="sett" id="sett" hidden>
     <div class="sh">설정</div>
     <div class="srow col"><div><b>스킨</b><span>컨트롤러는 실제 장비 같은 질감에 조그 가운데 화면이 있어요. 기본은 LP 레코드와 톤암이에요. 배치와 성능은 둘 다 같아요.</span></div><div class="seg two" id="skinSeg"><button data-s="ctl">컨트롤러</button><button data-s="lp">기본 (LP)</button></div></div>
+    <div class="srow col"><div class="hph"><div><b>폰 헤드폰</b><span>같은 와이파이나 폰 핫스팟에 있는 폰으로 다음 곡을 미리 들어요. 스피커는 스테레오 그대로예요.</span></div><button class="hb" id="hpBtn">켜기</button></div>
+      <div class="hpbox" id="hpBox" hidden><div class="hpq" id="hpQr"><span>QR 불러오는 중…</span></div>
+        <div class="hpi"><span>연결 코드</span><b id="hpCode"></b><span id="hpUrl" class="hpu"></span><span id="hpSt"></span><span>곡 전송 · 덱 A <em id="hpx0">—</em> · 덱 B <em id="hpx1">—</em></span><button class="hb" id="hpOff">끄기</button></div></div></div>
     <div class="srow"><div><b>터치하면 전체화면</b><span>화면을 터치하면 전체화면으로 바꿔서 주소창이 내려오지 않게 해요. 리모컨 뒤로가기로 빠져나와도 다음 터치에 다시 전체화면이 돼요.</span></div><button class="hb" id="afsBtn">켜짐</button></div>
     <div class="srow"><div><b>가벼운 모드</b><span>파형 해상도를 낮춰 TV에서 더 부드럽게 움직여요. 스탠바이미에서는 처음부터 켜져 있어요.</span></div><button class="hb" id="perfBtn">켜짐</button></div>
     <div class="srow col"><div><b>기기 정보</b><span id="uaInfo"></span></div></div>
@@ -512,6 +522,7 @@ try{ const v=localStorage.getItem('tdj.lite'); if(v!==null) LITE=v==='1'; VLAT=+
 let CTL=true;
 try{ CTL=localStorage.getItem('tdj.skin')!=='lp'; }catch(e){}
 document.documentElement.classList.toggle('ctl',CTL);
+let HPref=null;   // phone headphones, set up further down
 
 /* ================= stage fit ================= */
 const fit=$('fit'), stage=$('stage'); let S=1, fitN=0;
@@ -648,6 +659,7 @@ function buildChain(d){
 }
 const eqDb=v=>v<0?v*26:v*6;
 function applyMix(){
+  if(HPref) HPref.mix();
   if(!ctx) return; const t=ctx.currentTime, x=mix.xf;
   const g=[x<=.5?1:Math.cos((x-.5)*Math.PI), x>=.5?1:Math.cos((.5-x)*Math.PI)];
   decks.forEach((d,i)=>{ const n=d.nodes, f=mix.filt[i];
@@ -1106,7 +1118,7 @@ async function loadToDeck(i,tr){
     if(tok!==d.token) return;
     Object.assign(d,{pin:null,last:null,buffer:buf,dur:buf.duration,wave:bandWave(buf),ovc:null,grid,bpm,approx,wrap,hot,cue,offset:cue,title:tr.title,artist:tr.artist||'',key:tr.key||'',track:tr,loopOn:false,del:false});
     $('name'+i).textContent=d.title; $('art'+i).textContent=d.artist; $('hubk'+i).textContent=(d.key?d.key+' · ':'')+(d.bpm?Math.round(d.bpm)+' BPM':''); $('lt'+i).textContent=d.title;
-    uiPitch(d); uiHot(d); uiLoop(d); uiTransport(d); markLoaded();
+    uiPitch(d); uiHot(d); uiLoop(d); uiTransport(d); markLoaded(); if(HPref) HPref.load(i);
   }catch(e){
     if(tok!==d.token) return;
     $('name'+i).textContent='이 곡은 재생할 수 없어요'; $('art'+i).textContent='mp3, m4a, wav 파일을 권장해요';
@@ -1508,7 +1520,7 @@ document.addEventListener('pointerdown',e=>{
   if(AFS&&!e.target.closest('#fs,#afsBtn,label,input')) goFull();
 },{capture:true});
 // block page-level drags (pull-to-reveal) everywhere except the scrolling lists in the browser panel
-document.addEventListener('touchmove',e=>{ if(!e.target.closest('.rows,.lside')) e.preventDefault(); },{passive:false});
+document.addEventListener('touchmove',e=>{ if(!e.target.closest('.rows,.lside,.sett')) e.preventDefault(); },{passive:false});
 function uiAfs(){ const b=$('afsBtn'); b.classList.toggle('on',AFS); b.textContent=AFS?'켜짐':'꺼짐'; }
 $('afsBtn').addEventListener('click',()=>{ AFS=!AFS; try{localStorage.setItem('tdj.afs',AFS?'1':'0');}catch(e){} uiAfs(); if(AFS) goFull(); });
 uiAfs();
@@ -1590,6 +1602,7 @@ const ARM_IN=armAngle(ARM.rv*.955), ARM_OUT=armAngle(ARM.rv*.43);
 const ndot=$('ndot'), needle=$('needle'); let needleW=0, nState='', lastClock='', fN=0;
 function frame(){
   fN++;
+  if(HPref) HPref.tick();
   syncStep();
   decks.forEach((d,i)=>{
     const E=els[i], vp=vpos(d), p=pos(d);
@@ -1649,6 +1662,117 @@ $('skinSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); i
 setSkin(CTL);
 setMixMode(mixMode);
 uiPerf(); uiLat(); uiSync(); decks.forEach(uiPads);
+/* ================= phone headphones =================
+   A phone on the same network plays the headphone mix itself. The TV sends each loaded song file once
+   (over a WebRTC data channel, straight between the two devices) and then only small state messages:
+   where each deck is at a given moment of the TV clock, its speed and loop. The phone keeps its own clock
+   aligned with pings and plays the same position at the same moment, so Wi-Fi jitter never reaches the sound.
+   Nothing is streamed or encoded on the TV, so it costs almost nothing here. Signalling uses ntfy.sh. */
+const HP=(()=>{
+  const PHONE='https://y2kjang-sudo.github.io/Touch-DJ/phone.html', NTFY='https://ntfy.sh/';
+  let code=''; try{ code=localStorage.getItem('tdj.hpcode')||''; }catch(e){}
+  if(!/^\d{6}$/.test(code)){ code=String(Math.floor(100000+Math.random()*900000)); try{ localStorage.setItem('tdj.hpcode',code); }catch(e){} }
+  const topic='touchdj-hp-'+code, url=PHONE+'#j='+code;
+  let enabled=false, es=null, pc=null, dc=null, fc=null, nonce='', state='off', files=[null,null], fid=0, job=null, qrDone=false;
+  const last=[{},{}];
+  try{ enabled=localStorage.getItem('tdj.hp')==='1'; }catch(e){}
+  /* --- signalling (chunked JSON over ntfy, our own echoes ignored) --- */
+  const seen=new Set(), parts={};
+  function sig(obj){ const d=JSON.stringify(obj), id=Math.random().toString(36).slice(2,10), CH=3000, n=Math.ceil(d.length/CH)||1;
+    for(let i=0;i<n;i++) fetch(NTFY+topic,{method:'POST',body:JSON.stringify({k:'tdj',from:'tv',id,i,n,d:d.slice(i*CH,(i+1)*CH)})}).catch(()=>{}); }
+  function onRaw(raw){ let m; try{ m=JSON.parse(raw); }catch(e){ return; } if(!m||m.k!=='tdj'||m.from==='tv') return;
+    if(m.n>1){ const p=parts[m.id]||(parts[m.id]=[]); p[m.i]=m.d; if(p.filter(x=>x!=null).length<m.n) return; m.d=p.join(''); delete parts[m.id]; }
+    if(seen.has(m.id)) return; seen.add(m.id); let b; try{ b=JSON.parse(m.d); }catch(e){ return; }
+    if(b.t==='hello'&&b.n&&Date.now()-(b.at||0)<60000) connect(b.n);
+    else if(b.t==='answer'&&pc&&b.n===nonce) pc.setRemoteDescription({type:'answer',sdp:b.sdp}).catch(()=>{}); }
+  function listen(){ if(es) return; es=new EventSource(NTFY+topic+'/sse?since=1m');
+    es.onmessage=e=>{ try{ const j=JSON.parse(e.data); if(j.event==='message') onRaw(j.message); }catch(err){} }; }
+  async function connect(n){
+    if(pc&&pc.connectionState==='connected'&&n===nonce) return;
+    try{ pc&&pc.close(); }catch(e){}
+    nonce=n; setState('wait');
+    pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+    dc=pc.createDataChannel('ctl'); fc=pc.createDataChannel('file'); fc.binaryType='arraybuffer'; fc.bufferedAmountLowThreshold=1<<18;
+    dc.onopen=()=>{ setState('on'); files=[null,null]; sendMix(); decks.forEach((d,i)=>{ last[i]={}; if(d.buffer) load(i); }); };
+    dc.onmessage=e=>{ let m; try{ m=JSON.parse(e.data); }catch(err){ return; }
+      if(m.t==='ping') dc.send(JSON.stringify({t:'pong',a:m.a,b:performance.now()}));
+      else if(m.t==='need') load(m.deck,!!m.pcm); };
+    pc.onconnectionstatechange=()=>{ const s=pc.connectionState; if(s==='failed'||s==='disconnected'||s==='closed') setState('wait'); };
+    const off=await pc.createOffer(); await pc.setLocalDescription(off);
+    await new Promise(r=>{ if(pc.iceGatheringState==='complete') return r(); const t=setTimeout(r,2500);
+      pc.addEventListener('icegatheringstatechange',()=>{ if(pc.iceGatheringState==='complete'){ clearTimeout(t); r(); } }); });
+    sig({t:'offer',n,sdp:pc.localDescription.sdp});
+  }
+  const open=()=>dc&&dc.readyState==='open';
+  /* --- song files: the original file when there is one, else 16-bit PCM of the decoded buffer --- */
+  function wav(buf){ const ch=Math.min(2,buf.numberOfChannels), n=buf.length, sr=buf.sampleRate, out=new DataView(new ArrayBuffer(44+n*ch*2));
+    const w=(o,s)=>{ for(let k=0;k<s.length;k++) out.setUint8(o+k,s.charCodeAt(k)); };
+    w(0,'RIFF'); out.setUint32(4,36+n*ch*2,true); w(8,'WAVEfmt '); out.setUint32(16,16,true); out.setUint16(20,1,true); out.setUint16(22,ch,true);
+    out.setUint32(24,sr,true); out.setUint32(28,sr*ch*2,true); out.setUint16(32,ch*2,true); out.setUint16(34,16,true); w(36,'data'); out.setUint32(40,n*ch*2,true);
+    const cs=[0,1].slice(0,ch).map(c=>buf.getChannelData(c)); let o=44;
+    for(let k=0;k<n;k++) for(let c=0;c<ch;c++){ const v=Math.max(-1,Math.min(1,cs[c][k])); out.setInt16(o,v<0?v*32768:v*32767,true); o+=2; }
+    return new Blob([out.buffer],{type:'audio/wav'}); }
+  function load(i,pcm){
+    const d=decks[i]; if(!open()||!d.buffer) return;
+    const blob=(!pcm&&d.track&&d.track.file)?d.track.file:wav(d.buffer);
+    files[i]=++fid; if(job&&job.deck===i) job.stop=true;
+    const j={deck:i,id:fid,blob,stop:false}; (async()=>{ while(job&&!job.done) await new Promise(r=>setTimeout(r,50)); if(j.stop||files[i]!==j.id) return; job=j; await push(j); j.done=true; })();
+    last[i]={};
+  }
+  async function push(j){
+    const d=decks[j.deck], size=j.blob.size;
+    if(fc.readyState==='connecting') await new Promise(r=>fc.addEventListener('open',r,{once:true}));
+    if(fc.readyState!=='open') return;
+    fc.send(JSON.stringify({t:'file',deck:j.deck,id:j.id,size,name:d.title||'',dur:d.dur}));
+    for(let a=0;a<size&&!j.stop;a+=1<<20){
+      const ab=await j.blob.slice(a,Math.min(size,a+(1<<20))).arrayBuffer();
+      for(let o=0;o<ab.byteLength&&!j.stop;o+=16384){
+        if(fc.readyState!=='open'){ j.stop=true; break; }
+        if(fc.bufferedAmount>(1<<20)) await new Promise(r=>{ fc.onbufferedamountlow=()=>{ fc.onbufferedamountlow=null; r(); }; });
+        fc.send(ab.slice(o,Math.min(ab.byteLength,o+16384)));
+      }
+      if(j.deck!==undefined) setT($('hpx'+j.deck),Math.round(Math.min(1,(a+(1<<20))/size)*100)+'%');
+    }
+    if(!j.stop&&fc.readyState==='open') fc.send(JSON.stringify({t:'end',deck:j.deck,id:j.id}));
+  }
+  /* --- deck state: position at the moment the TV speaker plays it, in TV performance.now() time --- */
+  function posAt(d,T){ if(!d.buffer) return 0; if(!d.playing||!ctx) return d.offset;
+    let p=d.offset+(T-d.startedAt)*rate(d);
+    if(d.loopOn&&p>=d.lout) p=d.lin+((p-d.lin)%(d.lout-d.lin)); else if(d.wrap) p=((p%d.dur)+d.dur)%d.dur; return p; }
+  function snap(i){ const d=decks[i]; let at,T;
+    const ts=ctx&&ctx.getOutputTimestamp?ctx.getOutputTimestamp():null;
+    if(ts&&ts.performanceTime){ at=ts.performanceTime; T=ts.contextTime; } else { at=performance.now(); T=ctx?ctx.currentTime-(ctx.outputLatency||0):0; }
+    return {t:'st',deck:i,id:files[i],at:at+VLAT,p:posAt(d,T),r:rate(d),pl:d.playing&&!!d.buffer,lp:d.loopOn?[d.lin,d.lout]:null,wr:d.wrap,dur:d.dur}; }
+  function tick(){
+    if(state!=='on'||!open()) return; const now=performance.now();
+    decks.forEach((d,i)=>{ const s=snap(i), L=last[i];
+      const key=s.id+'|'+s.pl+'|'+s.r.toFixed(5)+'|'+(s.lp?s.lp.join(','):'')+'|'+s.wr;
+      let jump=false;
+      if(L.s&&s.pl&&L.s.pl){ let e=L.s.p+(s.at-L.s.at)/1000*L.s.r; if(s.lp&&e>=s.lp[1]) e=s.lp[0]+((e-s.lp[0])%(s.lp[1]-s.lp[0])); jump=Math.abs(e-s.p)>.02; }
+      else if(L.s&&!s.pl) jump=Math.abs(L.s.p-s.p)>.005;
+      if(key!==L.key||jump||now-(L.t||0)>250){ dc.send(JSON.stringify(s)); L.key=key; L.s=s; L.t=now; } });
+  }
+  let mixT=0;
+  function sendMix(){ if(!open()) return; clearTimeout(mixT);
+    mixT=setTimeout(()=>{ if(open()) dc.send(JSON.stringify({t:'mix',eq:mix.eq,kill:mix.kill,filt:mix.filt,vol:mix.vol,xf:mix.xf})); },20); }
+  /* --- UI --- */
+  function setState(s){ state=s; const b=$('hpBtn'); if(!b) return;
+    b.textContent=!enabled?'켜기':s==='on'?'연결됨':'기다리는 중'; b.classList.toggle('on',enabled&&s==='on');
+    setT($('hpSt'),!enabled?'꺼져 있어요':s==='on'?'폰과 연결됐어요':'폰을 기다리는 중이에요. 폰으로 QR을 찍고 \'연결\'을 눌러 주세요.'); }
+  function qr(){ if(qrDone) return; qrDone=true; const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js';
+    s.onload=()=>{ try{ const q=qrcode(0,'M'); q.addData(url); q.make(); $('hpQr').innerHTML='<img alt="QR" src="'+q.createDataURL(5,2)+'">'; }catch(e){} };
+    s.onerror=()=>{ qrDone=false; }; document.head.appendChild(s); }
+  function enable(on){ enabled=on; try{ localStorage.setItem('tdj.hp',on?'1':'0'); }catch(e){}
+    $('hpBox').hidden=!on;
+    if(on){ listen(); qr(); setState(state==='on'?'on':'wait'); }
+    else{ try{ es&&es.close(); }catch(e){} es=null; try{ pc&&pc.close(); }catch(e){} pc=dc=fc=null; setState('off'); } }
+  $('hpCode').textContent=code; $('hpUrl').textContent=url;
+  $('hpBtn').addEventListener('click',()=>{ if(!enabled) enable(true); });
+  $('hpOff').addEventListener('click',()=>enable(false));
+  if(enabled) enable(true); else setState('off');
+  return {tick,load:i=>{ if(open()) load(i); },mix:sendMix};
+})();
+HPref=HP;
 /* ================= boot ================= */
 decks.forEach(d=>{ uiPitch(d); uiTransport(d); uiHot(d); });
 buildViews();

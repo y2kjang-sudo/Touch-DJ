@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>터치 DJ 헤드폰</title>
+<style>
+/* Phone headphones for Touch DJ. The TV sends each deck's song once and then only where the deck is at a
+   given moment of the TV clock; this page keeps its clock aligned with pings and plays the same position at
+   the same moment through Web Audio, with the same EQ and filter as the TV mixer. */
+:root{--bg:#08090b;--panel:#131417;--panel2:#1b1c20;--line:rgba(255,255,255,.08);--fg:#eceef2;--mu:#8d929c;--a:#ff9c3d;--b:#33d6cb;--ok:#3ee08a;--bad:#ff4f6a;--warn:#ffb648;color-scheme:dark}
+*{box-sizing:border-box;margin:0}
+html,body{background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+body{padding:max(16px,env(safe-area-inset-top)) 16px max(20px,env(safe-area-inset-bottom));max-width:520px;margin:0 auto;display:grid;gap:12px}
+h1{font-size:19px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+h1 small{font-size:12px;color:var(--mu);font-weight:500}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}
+.st{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px}
+.st i{width:10px;height:10px;border-radius:50%;background:var(--mu);flex:none}
+.st.ok i{background:var(--ok);box-shadow:0 0 8px var(--ok)} .st.bad i{background:var(--bad)} .st.wait i{background:var(--warn)}
+button{font:inherit;font-weight:700;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:12px;height:48px;padding:0 14px;touch-action:manipulation}
+.go{width:100%;height:64px;font-size:19px;background:var(--fg);color:#0b0c0e;margin-top:12px}
+.decks{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.deck{--c:var(--a)} .deck.b{--c:var(--b)}
+.dn{font-size:11px;font-weight:800;letter-spacing:.16em;color:var(--c)}
+.tt{font-size:14px;font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:20px}
+.ds{font-size:12px;color:var(--mu);margin-top:2px;min-height:18px;font-variant-numeric:tabular-nums}
+.bar{height:4px;border-radius:2px;background:var(--panel2);margin-top:8px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--c)}
+.cue{width:100%;height:76px;margin-top:10px;font-size:20px;letter-spacing:.12em;border-radius:14px}
+.cue.on{background:var(--c);border-color:var(--c);color:#0b0c0e}
+.lab{font-size:12px;color:var(--mu);display:flex;justify-content:space-between}
+.lab b{color:var(--fg);font-weight:600}
+input[type=range]{width:100%;height:36px;accent-color:var(--fg);margin-top:4px}
+.trim{display:grid;grid-template-columns:1fr 1fr auto 1fr 1fr;gap:8px;align-items:center;margin-top:8px}
+.trim b{font:700 22px ui-monospace,Menlo,monospace;min-width:92px;text-align:center}
+.fine{font-size:12px;color:var(--mu);margin-top:8px;font-variant-numeric:tabular-nums}
+.tip{font-size:12.5px;color:var(--mu);line-height:1.6}
+</style></head>
+<body>
+<h1>터치 DJ 헤드폰 <small id="code"></small></h1>
+<div class="card"><div class="st wait" id="st"><i></i><span>연결 전이에요</span></div>
+  <button class="go" id="go">연결</button>
+  <div class="tip" id="tip" style="margin-top:10px">TV와 같은 와이파이(또는 이 폰의 핫스팟)에 연결된 상태에서 눌러 주세요. 유선 이어폰을 쓰면 가장 정확해요.</div></div>
+<div class="decks">
+  <div class="card deck a"><div class="dn">DECK A</div><div class="tt" id="t0">—</div><div class="ds" id="s0"></div><div class="bar"><i id="b0"></i></div><button class="cue" id="c0">CUE</button></div>
+  <div class="card deck b"><div class="dn">DECK B</div><div class="tt" id="t1">—</div><div class="ds" id="s1"></div><div class="bar"><i id="b1"></i></div><button class="cue on" id="c1">CUE</button></div>
+</div>
+<div class="card"><div class="lab"><span>CUE</span><b>헤드폰 믹스</b><span>MASTER</span></div><input type="range" id="mx" min="0" max="100" value="25">
+  <div class="lab" style="margin-top:10px"><span>헤드폰 볼륨</span><b id="vv">80</b></div><input type="range" id="vol" min="0" max="100" value="80"></div>
+<div class="card"><div class="lab"><span>TV 스피커와 맞추기</span><span>폰이 먼저 나면 +, 늦으면 −</span></div>
+  <div class="trim"><button data-t="-20">−20</button><button data-t="-5">−5</button><b id="trim">0 ms</b><button data-t="5">+5</button><button data-t="20">+20</button></div>
+  <div class="fine" id="fine">시계 오차 —</div></div>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id), NTFY='https://ntfy.sh/';
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v)), med=a=>{ const s=[...a].sort((x,y)=>x-y); return s.length?s[s.length>>1]:NaN; };
+const ls=(k,v)=>{ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v); }catch(e){} return null; };
+let CODE=(new URLSearchParams(location.hash.slice(1)).get('j'))||ls('tdj.hp.code')||'';
+if(/^\d{6}$/.test(CODE)) ls('tdj.hp.code',CODE);
+$('code').textContent=CODE?'코드 '+CODE:'';
+let TRIM=+(ls('tdj.hp.trim')||0)||0, MX=+(ls('tdj.hp.mx')||25), VOL=+(ls('tdj.hp.vol')||80);
+let cueOn=[false,true]; try{ const c=JSON.parse(ls('tdj.hp.cue')||'null'); if(Array.isArray(c)) cueOn=c; }catch(e){}
+const st=(cls,txt)=>{ $('st').className='st '+cls; $('st').lastElementChild.textContent=txt; };
+
+/* ---------- audio graph: per deck EQ → filter → (cue send, master send) ---------- */
+let ctx=null, out, cueBus, masBus, wake=null;
+const D=[0,1].map(i=>({i,buf:null,id:0,s:null,src:null,o:0,t0:0,r:1,key:'',lastRe:0,dec:false,n:{}}));
+const mix={eq:[[0,0,0],[0,0,0]],kill:[[false,false,false],[false,false,false]],filt:[0,0],vol:[.85,.85],xf:.5};
+function audio(){
+  if(ctx) return; const AC=window.AudioContext||window.webkitAudioContext; ctx=new AC({latencyHint:'interactive'});
+  out=ctx.createGain(); out.connect(ctx.destination); cueBus=ctx.createGain(); masBus=ctx.createGain(); cueBus.connect(out); masBus.connect(out);
+  D.forEach(d=>{ const bq=(type,f,q)=>{ const b=ctx.createBiquadFilter(); b.type=type; b.frequency.value=f; if(q) b.Q.value=q; return b; }, n=d.n;
+    n.lo=bq('lowshelf',220); n.mid=bq('peaking',1100,.8); n.hi=bq('highshelf',3800); n.hp=bq('highpass',20,.9); n.lp=bq('lowpass',20000,.9);
+    n.cue=ctx.createGain(); n.mas=ctx.createGain();
+    n.lo.connect(n.mid); n.mid.connect(n.hi); n.hi.connect(n.hp); n.hp.connect(n.lp); n.lp.connect(n.cue); n.lp.connect(n.mas); n.cue.connect(cueBus); n.mas.connect(masBus); });
+  applyMix(); applyHead();
+}
+const eqDb=v=>v<0?v*26:v*6;
+function applyMix(){
+  if(!ctx) return; const t=ctx.currentTime, x=mix.xf, g=[x<=.5?1:Math.cos((x-.5)*Math.PI), x>=.5?1:Math.cos((.5-x)*Math.PI)];
+  D.forEach((d,i)=>{ const n=d.n, f=mix.filt[i], eg=j=>mix.kill[i][j]?-40:eqDb(mix.eq[i][j]);
+    n.hi.gain.setTargetAtTime(eg(0),t,.01); n.mid.gain.setTargetAtTime(eg(1),t,.01); n.lo.gain.setTargetAtTime(eg(2),t,.01);
+    n.lp.frequency.setTargetAtTime(f<-.02?20000*Math.pow(180/20000,-f):20000,t,.015);
+    n.hp.frequency.setTargetAtTime(f>.02?20*Math.pow(5000/20,f):20,t,.015);
+    n.mas.gain.setTargetAtTime(mix.vol[i]*mix.vol[i]*g[i],t,.01); });
+}
+function applyHead(){
+  if(!ctx) return; const t=ctx.currentTime, m=MX/100;
+  D.forEach((d,i)=>d.n.cue.gain.setTargetAtTime(cueOn[i]?1:0,t,.01));
+  cueBus.gain.setTargetAtTime(Math.cos(m*Math.PI/2),t,.02); masBus.gain.setTargetAtTime(Math.sin(m*Math.PI/2),t,.02);
+  out.gain.setTargetAtTime(Math.pow(VOL/100,2),t,.02);
+}
+
+/* ---------- clock: TV performance.now() = phone performance.now() + off ---------- */
+let offs=[];
+function clock(){ const b=[...offs].sort((a,c)=>a.rtt-c.rtt).slice(0,5); return b.length?{off:med(b.map(x=>x.off)),rtt:med(b.map(x=>x.rtt))}:null; }
+function perfOfCtx(T){ const ts=ctx.getOutputTimestamp?ctx.getOutputTimestamp():null;
+  if(ts&&ts.performanceTime) return ts.performanceTime+(T-ts.contextTime)*1000;
+  return performance.now()+(T-ctx.currentTime+(ctx.outputLatency||0)+(ctx.baseLatency||0))*1000; }
+
+/* ---------- following the TV ---------- */
+function wrapPos(x,s){ if(s.lp&&x>=s.lp[1]) x=s.lp[0]+((x-s.lp[0])%(s.lp[1]-s.lp[0])); else if(s.wr&&s.dur) x=((x%s.dur)+s.dur)%s.dur; return x; }
+function expect(d,P,c){ const s=d.s; if(!s.pl) return s.p; return wrapPos(s.p+((P+c.off-TRIM)-s.at)/1000*s.r,s); }
+function mine(d,T){ return wrapPos(d.o+(T-d.t0)*d.r,d.s); }
+function stop(d){ if(d.src){ try{ d.src.stop(); }catch(e){} d.src.disconnect(); d.src=null; } }
+function restart(d,c){
+  stop(d); const s=d.s, T0=ctx.currentTime+.04; let x=expect(d,perfOfCtx(T0),c);
+  if(!s.wr&&!s.lp&&x>=d.buf.duration-.02) return;
+  const src=ctx.createBufferSource(); src.buffer=d.buf; src.playbackRate.value=s.r;
+  if(s.lp){ src.loop=true; src.loopStart=s.lp[0]; src.loopEnd=s.lp[1]; } else if(s.wr){ src.loop=true; }
+  src.connect(d.n.lo);
+  if(x<0){ src.start(T0-x/s.r,0); x=0; } else src.start(T0,x);
+  d.src=src; d.o=x; d.t0=T0; d.r=s.r; d.key=JSON.stringify([s.lp,s.wr]); d.lastRe=performance.now();
+}
+function follow(d){
+  const s=d.s, c=clock(); if(!ctx||!s||!c) return;
+  if(!d.buf||s.id!==d.id||!s.pl){ stop(d); return; }
+  const key=JSON.stringify([s.lp,s.wr]);
+  if(!d.src||key!==d.key){ restart(d,c); return; }
+  const T=ctx.currentTime; let err=expect(d,perfOfCtx(T),c)-mine(d,T);
+  if(s.lp){ const L=s.lp[1]-s.lp[0]; err-=Math.round(err/L)*L; } else if(s.wr&&s.dur){ err-=Math.round(err/s.dur)*s.dur; }
+  if(Math.abs(err)>.025){ if(performance.now()-d.lastRe>150) restart(d,c); return; }
+  // small drift: lean on the speed for half a second instead of jumping
+  const nr=s.r*(1+clamp(err/.5,-.02,.02)); if(Math.abs(nr-d.r)<1e-5) return;
+  d.o=mine(d,T); d.t0=T; d.r=nr; d.src.playbackRate.setValueAtTime(nr,T);
+}
+setInterval(()=>D.forEach(follow),60);
+
+/* ---------- connection ---------- */
+let pc=null, dc=null, fc=null, nonce='', inc=null;
+const seen=new Set(), parts={};
+function sig(obj){ const d=JSON.stringify(obj), id=Math.random().toString(36).slice(2,10), CH=3000, n=Math.ceil(d.length/CH)||1;
+  for(let i=0;i<n;i++) fetch(NTFY+'touchdj-hp-'+CODE,{method:'POST',body:JSON.stringify({k:'tdj',from:'ph',id,i,n,d:d.slice(i*CH,(i+1)*CH)})}).catch(()=>{}); }
+let es=null;
+function listen(){ if(es) return; es=new EventSource(NTFY+'touchdj-hp-'+CODE+'/sse?since=30s');
+  es.onmessage=e=>{ let j; try{ j=JSON.parse(e.data); }catch(err){ return; } if(j.event!=='message') return; let m; try{ m=JSON.parse(j.message); }catch(err){ return; }
+    if(!m||m.k!=='tdj'||m.from==='ph') return;
+    if(m.n>1){ const p=parts[m.id]||(parts[m.id]=[]); p[m.i]=m.d; if(p.filter(x=>x!=null).length<m.n) return; m.d=p.join(''); delete parts[m.id]; }
+    if(seen.has(m.id)) return; seen.add(m.id); let b; try{ b=JSON.parse(m.d); }catch(err){ return; }
+    if(b.t==='offer'&&b.n===nonce) answer(b.sdp); }; }
+async function answer(sdp){
+  try{ pc&&pc.close(); }catch(e){}
+  pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+  pc.ondatachannel=e=>{ const ch=e.channel;
+    if(ch.label==='ctl'){ dc=ch; dc.onopen=()=>{ st('ok','TV와 연결됐어요'); offs=[]; ping(); }; dc.onmessage=ev=>onCtl(JSON.parse(ev.data)); }
+    else if(ch.label==='file'){ fc=ch; fc.binaryType='arraybuffer'; fc.onmessage=ev=>onFile(ev.data); } };
+  pc.onconnectionstatechange=()=>{ const s=pc.connectionState;
+    if(s==='failed'||s==='disconnected') st('bad','연결이 끊겼어요. \'다시 연결\'을 눌러 주세요'); else if(s==='connecting') st('wait','연결하는 중…'); };
+  await pc.setRemoteDescription({type:'offer',sdp});
+  await pc.setLocalDescription(await pc.createAnswer());
+  await new Promise(r=>{ if(pc.iceGatheringState==='complete') return r(); const t=setTimeout(r,2500);
+    pc.addEventListener('icegatheringstatechange',()=>{ if(pc.iceGatheringState==='complete'){ clearTimeout(t); r(); } }); });
+  sig({t:'answer',n:nonce,sdp:pc.localDescription.sdp});
+}
+function ping(){ if(!dc||dc.readyState!=='open') return; dc.send(JSON.stringify({t:'ping',a:performance.now()})); setTimeout(ping,offs.length<12?120:1000); }
+function onCtl(m){
+  if(m.t==='pong'){ const now=performance.now(), rtt=now-m.a; offs.push({off:m.b-(m.a+rtt/2),rtt}); if(offs.length>40) offs.shift(); }
+  else if(m.t==='st'){ const d=D[m.deck]; d.s=m; follow(d); }
+  else if(m.t==='mix'){ Object.assign(mix,m); applyMix(); }
+}
+function onFile(data){
+  if(typeof data==='string'){ const m=JSON.parse(data), d=D[m.deck];
+    if(m.t==='file'){ inc={deck:m.deck,id:m.id,size:m.size,got:0,parts:[]}; stop(d); d.buf=null; d.id=0;
+      $('t'+m.deck).textContent=m.name||'—'; $('s'+m.deck).textContent='받는 중 0%'; $('b'+m.deck).style.width='0'; }
+    else if(m.t==='end'&&inc&&inc.id===m.id){ const x=inc; inc=null; decode(x); }
+    return; }
+  if(!inc) return; inc.parts.push(data); inc.got+=data.byteLength;
+  const pct=Math.round(inc.got/inc.size*100); if(pct!==inc.pct){ inc.pct=pct; $('s'+inc.deck).textContent='받는 중 '+pct+'%'; $('b'+inc.deck).style.width=pct+'%'; }
+}
+async function decode(x){
+  const d=D[x.deck]; $('s'+x.deck).textContent='여는 중…';
+  const ab=await new Blob(x.parts).arrayBuffer(); x.parts=null;
+  try{
+    let buf=await new Promise((res,rej)=>{ const p=ctx.decodeAudioData(ab,res,rej); if(p&&p.then) p.then(res,rej); });
+    // keep memory low: resample to 32 kHz like the TV does (about 75 MB for a 5-minute stereo song)
+    if(buf.sampleRate>32000&&window.OfflineAudioContext){ try{ const oc=new OfflineAudioContext(Math.min(2,buf.numberOfChannels),Math.ceil(buf.duration*32000),32000);
+      const s=oc.createBufferSource(); s.buffer=buf; s.connect(oc.destination); s.start(); buf=await oc.startRendering(); }catch(e){} }
+    d.buf=buf; d.id=x.id; d.src=null; $('s'+x.deck).textContent='준비됨 · '+Math.floor(buf.duration/60)+':'+String(Math.floor(buf.duration%60)).padStart(2,'0'); $('b'+x.deck).style.width='100%';
+    if(d.s) follow(d);
+  }catch(e){
+    $('s'+x.deck).textContent='이 형식은 폰에서 못 열어서 다시 받는 중…';
+    if(dc&&dc.readyState==='open') dc.send(JSON.stringify({t:'need',deck:x.deck,pcm:true}));
+  }
+}
+
+/* ---------- UI ---------- */
+function ui(){ [0,1].forEach(i=>$('c'+i).classList.toggle('on',!!cueOn[i])); $('mx').value=MX; $('vol').value=VOL; $('vv').textContent=VOL; $('trim').textContent=(TRIM>0?'+':'')+TRIM+' ms'; }
+[0,1].forEach(i=>$('c'+i).addEventListener('click',()=>{ cueOn[i]=!cueOn[i]; ls('tdj.hp.cue',JSON.stringify(cueOn)); ui(); applyHead(); }));
+$('mx').addEventListener('input',e=>{ MX=+e.target.value; ls('tdj.hp.mx',MX); applyHead(); });
+$('vol').addEventListener('input',e=>{ VOL=+e.target.value; ls('tdj.hp.vol',VOL); $('vv').textContent=VOL; applyHead(); });
+document.querySelectorAll('.trim [data-t]').forEach(b=>b.addEventListener('click',()=>{ TRIM+=+b.dataset.t; ls('tdj.hp.trim',TRIM); ui(); D.forEach(d=>{ d.lastRe=0; }); }));
+setInterval(()=>{ const c=clock(); $('fine').textContent=c?'시계 오차 ±'+Math.round(c.rtt/2)+' ms':'시계 오차 —';
+  D.forEach((d,i)=>{ if(d.buf&&d.s&&!inc){ const p=d.s.pl&&ctx&&c?expect(d,perfOfCtx(ctx.currentTime),c):d.s.p; $('s'+i).textContent=(d.s.pl?'▶ ':'❚❚ ')+Math.floor(p/60)+':'+String(Math.floor(p%60)).padStart(2,'0')+(d.s.lp?' · 루프':''); } }); },500);
+async function keepAwake(){ try{ if('wakeLock' in navigator&&document.visibilityState==='visible') wake=await navigator.wakeLock.request('screen'); }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ keepAwake(); if(ctx) ctx.resume(); } });
+$('go').addEventListener('click',()=>{
+  if(!/^\d{6}$/.test(CODE)){ const c=prompt('TV 설정 > 폰 헤드폰에 보이는 6자리 코드를 넣어 주세요'); if(!c||!/^\d{6}$/.test(c.trim())) return; CODE=c.trim(); ls('tdj.hp.code',CODE); $('code').textContent='코드 '+CODE; }
+  try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}   // iPhone: play even with the silent switch on
+  audio(); ctx.resume(); keepAwake();
+  // a short silent buffer unlocks audio output on iPhone
+  try{ const b=ctx.createBuffer(1,1,ctx.sampleRate), s=ctx.createBufferSource(); s.buffer=b; s.connect(ctx.destination); s.start(); }catch(e){}
+  listen(); nonce=Math.random().toString(36).slice(2,10); st('wait','TV를 찾는 중… (TV에서 설정 > 폰 헤드폰이 켜져 있어야 해요)');
+  sig({t:'hello',n:nonce,at:Date.now()}); $('go').textContent='다시 연결';
+});
+ui();
+window.__hp={D,clock,mix};
+})();
+</script>
+</body></html>
