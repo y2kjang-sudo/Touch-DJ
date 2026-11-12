@@ -1716,7 +1716,9 @@ const HP=(()=>{
     const d=decks[i]; if(!open()||!d.buffer) return;
     const blob=(!pcm&&d.track&&d.track.file)?d.track.file:wav(d.buffer);
     files[i]=++fid; if(job&&job.deck===i) job.stop=true;
-    const j={deck:i,id:fid,blob,stop:false}; (async()=>{ while(job&&!job.done) await new Promise(r=>setTimeout(r,50)); if(j.stop||files[i]!==j.id) return; job=j; await push(j); j.done=true; })();
+    const j={deck:i,id:fid,blob,stop:false}; (async()=>{ while(job&&!job.done) await new Promise(r=>setTimeout(r,50)); if(j.stop||files[i]!==j.id) return; job=j;
+      try{ await push(j); }catch(e){ setT($('hpx'+i),'실패'); try{ dc.send(JSON.stringify({t:'err',deck:i,msg:String(e&&e.message||e)})); }catch(err){} }
+      j.done=true; })();
     last[i]={};
   }
   async function push(j){
@@ -1725,10 +1727,11 @@ const HP=(()=>{
     if(fc.readyState!=='open') return;
     fc.send(JSON.stringify({t:'file',deck:j.deck,id:j.id,size,name:d.title||'',dur:d.dur}));
     for(let a=0;a<size&&!j.stop;a+=1<<20){
-      const ab=await j.blob.slice(a,Math.min(size,a+(1<<20))).arrayBuffer();
+      const part=j.blob.slice(a,Math.min(size,a+(1<<20)));
+      const ab=part.arrayBuffer?await part.arrayBuffer():await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=()=>rej(fr.error); fr.readAsArrayBuffer(part); });
       for(let o=0;o<ab.byteLength&&!j.stop;o+=16384){
         if(fc.readyState!=='open'){ j.stop=true; break; }
-        if(fc.bufferedAmount>(1<<20)) await new Promise(r=>{ fc.onbufferedamountlow=()=>{ fc.onbufferedamountlow=null; r(); }; });
+        while(fc.readyState==='open'&&fc.bufferedAmount>(1<<20)) await new Promise(r=>setTimeout(r,8));   // polling: some TV browsers never fire bufferedamountlow
         fc.send(ab.slice(o,Math.min(ab.byteLength,o+16384)));
       }
       if(j.deck!==undefined) setT($('hpx'+j.deck),Math.round(Math.min(1,(a+(1<<20))/size)*100)+'%');

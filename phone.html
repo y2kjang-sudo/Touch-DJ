@@ -50,6 +50,7 @@ input[type=range]{width:100%;height:36px;accent-color:var(--fg);margin-top:4px}
 <div class="card"><div class="lab"><span>TV 스피커와 맞추기</span><span>폰이 먼저 나면 +, 늦으면 −</span></div>
   <div class="trim"><button data-t="-20">−20</button><button data-t="-5">−5</button><b id="trim">0 ms</b><button data-t="5">+5</button><button data-t="20">+20</button></div>
   <div class="fine" id="fine">시계 오차 —</div></div>
+<div class="card"><div class="lab"><span>기록</span><span>문제가 있으면 이 칸을 캡처해 주세요</span></div><div id="log" style="font:11.5px/1.55 ui-monospace,Menlo,monospace;color:var(--mu);margin-top:6px;white-space:pre-wrap;max-height:180px;overflow:auto"></div></div>
 <script>
 (function(){
 'use strict';
@@ -61,6 +62,9 @@ if(/^\d{6}$/.test(CODE)) ls('tdj.hp.code',CODE);
 $('code').textContent=CODE?'코드 '+CODE:'';
 let TRIM=+(ls('tdj.hp.trim')||0)||0, MX=+(ls('tdj.hp.mx')||25), VOL=+(ls('tdj.hp.vol')||80);
 let cueOn=[false,true]; try{ const c=JSON.parse(ls('tdj.hp.cue')||'null'); if(Array.isArray(c)) cueOn=c; }catch(e){}
+const LOG=[]; function log(m){ LOG.push(new Date().toTimeString().slice(0,8)+' '+m); if(LOG.length>30) LOG.shift(); const el=$('log'); if(el){ el.textContent=LOG.join('\n'); el.scrollTop=1e9; } }
+window.addEventListener('error',e=>log('오류: '+e.message)); window.addEventListener('unhandledrejection',e=>log('오류: '+(e.reason&&e.reason.message||e.reason)));
+const LET=['A','B'];
 const st=(cls,txt)=>{ $('st').className='st '+cls; $('st').lastElementChild.textContent=txt; };
 
 /* ---------- audio graph: per deck EQ → filter → (cue send, master send) ---------- */
@@ -143,8 +147,9 @@ async function answer(sdp){
   try{ pc&&pc.close(); }catch(e){}
   pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
   pc.ondatachannel=e=>{ const ch=e.channel;
-    if(ch.label==='ctl'){ dc=ch; dc.onopen=()=>{ st('ok','TV와 연결됐어요'); offs=[]; ping(); }; dc.onmessage=ev=>onCtl(JSON.parse(ev.data)); }
-    else if(ch.label==='file'){ fc=ch; fc.binaryType='arraybuffer'; fc.onmessage=ev=>onFile(ev.data); } };
+    log('채널 받음: '+ch.label);
+    if(ch.label==='ctl'){ dc=ch; dc.onopen=()=>{ st('ok','TV와 연결됐어요'); log('제어 채널 열림'); offs=[]; ping(); }; dc.onmessage=ev=>onCtl(JSON.parse(ev.data)); }
+    else if(ch.label==='file'){ fc=ch; fc.binaryType='arraybuffer'; fc.onopen=()=>log('파일 채널 열림'); fc.onmessage=ev=>{ try{ onFile(ev.data); }catch(e){ log('파일 처리 오류: '+e.message); } }; } };
   pc.onconnectionstatechange=()=>{ const s=pc.connectionState;
     if(s==='failed'||s==='disconnected') st('bad','연결이 끊겼어요. \'다시 연결\'을 눌러 주세요'); else if(s==='connecting') st('wait','연결하는 중…'); };
   await pc.setRemoteDescription({type:'offer',sdp});
@@ -156,20 +161,24 @@ async function answer(sdp){
 function ping(){ if(!dc||dc.readyState!=='open') return; dc.send(JSON.stringify({t:'ping',a:performance.now()})); setTimeout(ping,offs.length<12?120:1000); }
 function onCtl(m){
   if(m.t==='pong'){ const now=performance.now(), rtt=now-m.a; offs.push({off:m.b-(m.a+rtt/2),rtt}); if(offs.length>40) offs.shift(); }
-  else if(m.t==='st'){ const d=D[m.deck]; d.s=m; follow(d); }
+  else if(m.t==='st'){ const d=D[m.deck]; d.s=m; follow(d);
+    const now=performance.now();
+    if(m.id&&m.id!==d.id&&!d.dec&&!(inc&&inc.deck===m.deck)){ if(!d.wait) d.wait=now; else if(now-d.wait>4000&&now-(d.asked||0)>8000){ d.asked=now; d.wait=0; log(LET[m.deck]+' 곡이 안 와서 다시 요청'); dc.send(JSON.stringify({t:'need',deck:m.deck})); } }
+    else d.wait=0; }
+  else if(m.t==='err'){ log('TV 전송 오류 ('+LET[m.deck]+'): '+m.msg); }
   else if(m.t==='mix'){ Object.assign(mix,m); applyMix(); }
 }
 function onFile(data){
   if(typeof data==='string'){ const m=JSON.parse(data), d=D[m.deck];
-    if(m.t==='file'){ inc={deck:m.deck,id:m.id,size:m.size,got:0,parts:[]}; stop(d); d.buf=null; d.id=0;
+    if(m.t==='file'){ log(LET[m.deck]+' 받기 시작: '+(m.name||'')+' ('+(m.size/1e6).toFixed(1)+' MB)'); inc={deck:m.deck,id:m.id,size:m.size,got:0,parts:[],t0:performance.now()}; stop(d); d.buf=null; d.id=0;
       $('t'+m.deck).textContent=m.name||'—'; $('s'+m.deck).textContent='받는 중 0%'; $('b'+m.deck).style.width='0'; }
-    else if(m.t==='end'&&inc&&inc.id===m.id){ const x=inc; inc=null; decode(x); }
+    else if(m.t==='end'&&inc&&inc.id===m.id){ const x=inc; inc=null; log(LET[x.deck]+' 다 받음 ('+((performance.now()-x.t0)/1000).toFixed(1)+'초), 여는 중'); decode(x); }
     return; }
   if(!inc) return; inc.parts.push(data); inc.got+=data.byteLength;
   const pct=Math.round(inc.got/inc.size*100); if(pct!==inc.pct){ inc.pct=pct; $('s'+inc.deck).textContent='받는 중 '+pct+'%'; $('b'+inc.deck).style.width=pct+'%'; }
 }
 async function decode(x){
-  const d=D[x.deck]; $('s'+x.deck).textContent='여는 중…';
+  const d=D[x.deck]; d.dec=true; $('s'+x.deck).textContent='여는 중…';
   const ab=await new Blob(x.parts).arrayBuffer(); x.parts=null;
   try{
     let buf=await new Promise((res,rej)=>{ const p=ctx.decodeAudioData(ab,res,rej); if(p&&p.then) p.then(res,rej); });
@@ -177,8 +186,8 @@ async function decode(x){
     if(buf.sampleRate>32000&&window.OfflineAudioContext){ try{ const oc=new OfflineAudioContext(Math.min(2,buf.numberOfChannels),Math.ceil(buf.duration*32000),32000);
       const s=oc.createBufferSource(); s.buffer=buf; s.connect(oc.destination); s.start(); buf=await oc.startRendering(); }catch(e){} }
     d.buf=buf; d.id=x.id; d.src=null; $('s'+x.deck).textContent='준비됨 · '+Math.floor(buf.duration/60)+':'+String(Math.floor(buf.duration%60)).padStart(2,'0'); $('b'+x.deck).style.width='100%';
-    if(d.s) follow(d);
-  }catch(e){
+    d.dec=false; log(LET[x.deck]+' 준비됨'); if(d.s) follow(d);
+  }catch(e){ d.dec=false; log(LET[x.deck]+' 열기 실패: '+(e&&e.message||e)+' → 다른 형식으로 다시 받기');
     $('s'+x.deck).textContent='이 형식은 폰에서 못 열어서 다시 받는 중…';
     if(dc&&dc.readyState==='open') dc.send(JSON.stringify({t:'need',deck:x.deck,pcm:true}));
   }
