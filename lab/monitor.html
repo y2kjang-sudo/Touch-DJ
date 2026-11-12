@@ -113,7 +113,7 @@ function tv(){
     o.connect(g); g.connect(dest); g.connect(spkDelay); o.start(t); o.stop(t+.07);
   }
   function tick(){
-    while(next<ctx.currentTime+.15){
+    while(next<ctx.currentTime+.4){
       const accent=beatN%4===0; click(next,accent);
       // tell the phone when this click left the TV's audio graph, in TV performance.now() time
       if(dc&&dc.readyState==='open'){ const ts=ctx.getOutputTimestamp?ctx.getOutputTimestamp():null;
@@ -133,9 +133,12 @@ function tv(){
   let AUTO=true, ph={phase:'',buf:0,pct:0}, lat=null;
   $('#auto').onclick=()=>{ AUTO=!AUTO; $('#auto').textContent=AUTO?'자동 맞춤 켜짐':'자동 맞춤 꺼짐'; if(AUTO&&isFinite(lastLat)) setDl(Math.round(lastLat/5)*5); };
   $('#dl').addEventListener('input',()=>{ if(AUTO){ AUTO=false; $('#auto').textContent='자동 맞춤 꺼짐'; } });
+  let mode2=null;
   function verdict(){
     const v=$('#ver'), v2=$('#ver2');
     if(!running){ return; }
+    if(mode2){ v.textContent='방법 2: 폰이 시계를 맞춰서 직접 딸깍 소리를 내요. TV와 폰 소리가 하나로 겹쳐 들리는지 들어 보세요.'; v.style.color='var(--ok)';
+      v2.textContent='시계 오차 ±'+Math.round(mode2.rtt/2)+' ms · 폰 맞춤 '+(mode2.trim>0?'+':'')+mode2.trim+' ms · 제때 낸 딸깍 '+mode2.ok+'개, 늦게 도착해 못 낸 것 '+mode2.late+'개'; return; }
     if(ph.phase==='fail'){ v.textContent='가장 큰 버퍼(300 ms)로도 소리가 끊겨요. 와이파이가 불안정해요. 공유기 가까이서, 폰을 5GHz 와이파이에 연결해서 다시 해 보세요.'; v.style.color='var(--bad)';
       v2.textContent='끊김 '+ph.pct.toFixed(1)+'%'; return; }
     if(ph.phase!=='done'||!lat||lat.count<6){ v.textContent='재는 중… 폰이 끊기지 않는 버퍼를 찾고 있어요 (지금 '+(ph.buf||'—')+' ms)'; v.style.color='var(--warn)'; v2.textContent=''; return; }
@@ -161,10 +164,11 @@ function tv(){
     dc=pc.createDataChannel('ctl'); dc.onopen=()=>log('데이터 채널 열림');
     dc.onmessage=e=>{ const m=JSON.parse(e.data);
       if(m.t==='ping') dc.send(JSON.stringify({t:'pong',a:m.a,b:performance.now()}));
-      else if(m.t==='auto'){ ph=m; verdict(); }
+      else if(m.t==='auto'){ ph=m; if(!mode2) verdict(); }
+      else if(m.t==='mode'){ if(m.m===2){ if(!mode2){ AUTO=false; $('#auto').textContent='자동 맞춤 꺼짐'; setDl(0); } mode2=m; } else mode2=null; verdict(); }
       else if(m.t==='q'){ $('#q').textContent='폰 버퍼 '+m.buf+' ms · '+m.txt; $('#q').style.color=m.pct>2?'var(--bad)':m.pct>0.3?'var(--warn)':'var(--ok)'; }
       else if(m.t==='lat'){ lastLat=m.total; lat=m;
-        if(AUTO&&m.count>=5&&m.jit<=60){ const want=Math.min(800,Math.round(m.total/5)*5); if(Math.abs(want-$('#dl').value)>=10) setDl(want); }
+        if(!mode2&&AUTO&&m.count>=5&&m.jit<=60){ const want=Math.min(800,Math.round(m.total/5)*5); if(Math.abs(want-$('#dl').value)>=10) setDl(want); }
         verdict(); $('#lat').textContent=Math.round(m.total)+' ms';
         $('#latd').textContent=`네트워크·버퍼 ${Math.round(m.net)} ms + 폰 출력 ${Math.round(m.out)} ms · 흔들림 ±${Math.round(m.jit)} ms · 시계 오차 ±${Math.round(m.rtt/2)} ms`; } };
     pc.onconnectionstatechange=()=>{ const s=pc.connectionState; log('연결 상태: '+s);
@@ -181,11 +185,40 @@ function phone(){
   const topic='touchdj-mon-'+JOIN;
   app.innerHTML=`<div><h1>폰 모니터 테스트 · 폰</h1><div class="sub">연결 코드 ${JOIN} · TV와 같은 와이파이에서 열어 주세요. 유선 이어폰을 쓰면 가장 정확해요.</div></div>
    <div class="card"><button class="tap pri" id="tap">탭해서 연결</button><div class="st wait" id="st" style="margin-top:14px"><i></i><span>대기 중</span></div></div>
+   <div class="card"><div class="lab">소리 내는 방식</div>
+     <div class="row" id="modes"><button data-m="2">방법 2 · 폰이 직접 (추천)</button><button data-m="1">방법 1 · 전송된 소리</button></div>
+     <div id="m2box"><div class="lab" style="margin-top:14px">TV 스피커와 맞추기 · 폰 소리가 먼저 나면 +, 늦게 나면 −</div>
+       <div class="row"><button data-t="-20">−20</button><button data-t="-5">−5</button><div class="big" id="trim" style="font-size:34px;min-width:120px;text-align:center">0 ms</div><button data-t="5">+5</button><button data-t="20">+20</button></div>
+       <div class="lab" id="m2st" style="margin-top:8px">TV에서 '자동 테스트 시작'을 누르면 소리가 나요.</div></div></div>
    <div class="card"><div class="lab">폰 대기 버퍼 · 자동으로 찾아요 (눌러서 직접 고르면 자동이 꺼져요)</div>
      <div class="row" id="bufs">${[20,40,60,80,120,160,200,300].map(v=>`<button data-v="${v}" style="height:44px;padding:0 14px">${v}</button>`).join('')}</div>
      <div class="lab" id="q" style="margin-top:10px">끊김: —</div></div>
    <div class="card"><div class="lab">TV에서 이 폰까지 걸리는 시간</div><div class="big" id="lat">— ms</div><div class="lab" id="latd">TV에서 메트로놈을 켜면 재기 시작해요.</div></div>
    <div class="card"><div class="lab">기록</div><div class="log" id="log"></div></div>`;
+  let MODE=2, TRIM=0, okN=0, lateN=0;
+  try{ TRIM=+(localStorage.getItem('tdj.montrim')||0)||0; }catch(e){}
+  try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}   // iPhone: play even with the silent switch on
+  const showMode=()=>{ document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',+b.dataset.m===MODE)); $('#m2box').style.display=MODE===2?'':'none';
+    $('#trim').textContent=(TRIM>0?'+':'')+TRIM+' ms'; if(el) el.muted=MODE===2; };
+  document.querySelectorAll('#modes button').forEach(b=>b.onclick=()=>{ MODE=+b.dataset.m; okN=lateN=0; showMode(); log(MODE===2?'방법 2: 폰이 직접 소리 내기':'방법 1: 전송된 소리 듣기');
+    if(MODE===1&&dc&&dc.readyState==='open') dc.send(JSON.stringify({t:'mode',m:1})); });
+  document.querySelectorAll('#m2box [data-t]').forEach(b=>b.onclick=()=>{ TRIM+=+b.dataset.t; try{ localStorage.setItem('tdj.montrim',TRIM); }catch(e){} showMode(); });
+  /* method 2: the TV announces each click ~0.3 s ahead in its own clock; the phone converts that to its own
+     audio clock (clock offset from the data-channel pings) and plays the click itself at that moment */
+  function localClick(at,accent){
+    const c=clock(); if(!c||!ctx) return;
+    const target=at-c.off+TRIM;          // phone performance.now() when the click should be heard
+    const ts=ctx.getOutputTimestamp?ctx.getOutputTimestamp():null;
+    const t=ts&&ts.performanceTime?ts.contextTime+(target-ts.performanceTime)/1000:ctx.currentTime+(target-performance.now())/1000-(ctx.outputLatency||0)-(ctx.baseLatency||0);
+    if(t<ctx.currentTime+.003){ lateN++; return; }
+    okN++;
+    const o=ctx.createOscillator(), g=ctx.createGain(); o.frequency.value=accent?1760:880;
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.9,t+.001); g.gain.exponentialRampToValueAtTime(.001,t+.06);
+    o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+.07);
+  }
+  setInterval(()=>{ if(MODE!==2) return; const c=clock();
+    $('#m2st').textContent=c?'시계 오차 ±'+Math.round(c.rtt/2)+' ms · 제때 낸 딸깍 '+okN+'개 · 늦게 도착해 못 낸 것 '+lateN+'개':'TV와 시계를 맞추는 중…';
+    if(c&&dc&&dc.readyState==='open') dc.send(JSON.stringify({t:'mode',m:2,trim:TRIM,rtt:c.rtt,ok:okN,late:lateN})); },1000);
   let pc,dc,ctx,an,buf,el,rx=null,offs=[],arrivals=[],sent={},nets=[],BUF=80,prev=null,qtxt='';
   const applyBuf=()=>{ if(rx){ try{ rx.jitterBufferTarget=BUF; }catch(e){} try{ rx.playoutDelayHint=BUF/1000; }catch(e){} }
     document.querySelectorAll('#bufs button').forEach(b=>b.classList.toggle('on',+b.dataset.v===BUF)); nets=[]; };
@@ -202,7 +235,7 @@ function phone(){
     if(dc&&dc.readyState==='open') dc.send(JSON.stringify({t:'auto',phase,buf:BUF,pct}));
   }
   document.querySelectorAll('#bufs button').forEach(b=>b.onclick=()=>{ AUTOB=false; phase='done'; BUF=+b.dataset.v; applyBuf(); log('버퍼 '+BUF+' ms'); });
-  applyBuf();
+  applyBuf(); setTimeout(showMode,0);
   /* every second: share of audio the phone had to fill in because packets came late or not at all */
   setInterval(async()=>{ if(!pc||!rx) return; let r=null; try{ (await rx.getStats()).forEach(x=>{ if(x.type==='inbound-rtp'&&x.kind==='audio') r=x; }); }catch(e){} if(!r) return;
     if(prev&&r.totalSamplesReceived>prev.totalSamplesReceived){ const n=r.totalSamplesReceived-prev.totalSamplesReceived, c=(r.concealedSamples||0)-(prev.concealedSamples||0);
@@ -218,13 +251,13 @@ function phone(){
     pc=new RTCPeerConnection({iceServers:ICE});
     pc.ontrack=e=>{ const stream=e.streams[0]||new MediaStream([e.track]);
       rx=e.receiver; prev=null; applyBuf();
-      el=new Audio(); el.autoplay=true; el.playsInline=true; el.srcObject=stream; el.play().catch(()=>log('재생하려면 화면을 한 번 더 탭해 주세요'));
+      el=new Audio(); el.autoplay=true; el.playsInline=true; el.srcObject=stream; el.muted=MODE===2; el.play().catch(()=>log('재생하려면 화면을 한 번 더 탭해 주세요'));
       const src=ctx.createMediaStreamSource(stream); an=ctx.createAnalyser(); an.fftSize=256; buf=new Float32Array(an.fftSize); src.connect(an);
       watch(); log('소리 받는 중'); };
     pc.ondatachannel=e=>{ dc=e.channel; dc.onopen=()=>{ log('데이터 채널 열림'); ping(); };
       dc.onmessage=ev=>{ const m=JSON.parse(ev.data);
         if(m.t==='pong'){ const now=performance.now(), rtt=now-m.a; offs.push({off:m.b-(m.a+rtt/2),rtt}); if(offs.length>30) offs.shift(); }
-        else if(m.t==='click'){ sent[m.n]=m.at; }
+        else if(m.t==='click'){ sent[m.n]=m.at; if(MODE===2) localClick(m.at,m.n%4===0); }
         else if(m.t==='start'&&AUTOB){ floor=-1; phase='tune'; setLevel(Math.max(0,STEPS.indexOf(80))); } }; };
     pc.onconnectionstatechange=()=>{ const s=pc.connectionState; log('연결 상태: '+s);
       if(s==='connected') st('ok','TV와 연결됐어요'); else if(s==='failed'||s==='disconnected') st('bad','연결이 끊겼어요. 다시 탭해 주세요'); else st('wait','연결 중…'); };
