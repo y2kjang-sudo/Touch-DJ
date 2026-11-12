@@ -307,6 +307,9 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 .dnote{flex-basis:100%;font-size:12.5px;line-height:1.6}
 .dnote::before{content:"! ";color:var(--loopln);font-weight:700}
 .needle .dot{will-change:transform}
+.mini.hpc.on{background:var(--c);border-color:var(--c);color:var(--bg)}
+.ctl .mini.hpc.on{background:#0b0c0e;color:var(--c);border-color:var(--c)} .ctl .mini.hpc.on::before{background:var(--c);box-shadow:0 0 6px var(--c)}
+.crow .mini.hpc{margin-left:auto;margin-right:8px}
 .hph{display:flex;gap:14px;align-items:center;justify-content:space-between}
 .hpbox{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;margin-top:10px}
 .hpq{background:#fff;border-radius:10px;padding:6px;min-width:120px;min-height:120px;display:flex;align-items:center;justify-content:center}
@@ -319,6 +322,7 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
    Everything here is static paint (gradients and shadows drawn once); during play only the
    jog marker (transform), the LED progress ring, the centre-display text and meters change. ===== */
 .cjog{display:none}
+.rsvg,.cdisp{will-change:transform}   /* own layers: progress/time updates must not re-raster the ring and platter textures */
 html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:rgba(255,255,255,.075);--groove:#101114;--groove2:#0b0c0e;
   --fg:#eceef2;--muted:#8d929c;--t3:#4f545d;
   --a:#ff9c3d;--a2:#ffd2a1;--a-dim:#4a3017;--b:#33d6cb;--b2:#b9f3ee;--b-dim:#144a46;
@@ -447,7 +451,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v18</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v21</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -571,6 +575,7 @@ const deckHTML=i=>`
   <div class="ctrl">
     <div class="crow">
       <div class="ptabs" id="pt${i}"><button data-m="hot" class="on">핫큐</button><button data-m="jump">점프</button><button data-m="roll">롤</button><button data-m="del" class="x" id="hdel${i}" aria-label="핫큐 지우기">✕</button></div>
+      <button class="mini hpc" id="hpc${i}" hidden aria-label="${LET[i]} 헤드폰">헤드폰</button>
       <button class="mini on" id="qz${i}" aria-label="퀀타이즈">퀀타이즈</button>
     </div>
     <div class="hots" id="hots${i}">${[0,1,2,3,4,5,6,7].map(k=>`<button class="hc" data-k="${k}">${'ABCDEFGH'[k]}</button>`).join('')}</div>
@@ -1674,7 +1679,10 @@ const HP=(()=>{
   let code=''; try{ code=localStorage.getItem('tdj.hpcode')||''; }catch(e){}
   if(!/^\d{6}$/.test(code)){ code=String(Math.floor(100000+Math.random()*900000)); try{ localStorage.setItem('tdj.hpcode',code); }catch(e){} }
   const topic='touchdj-hp-'+code, url=PHONE+'#j='+code;
-  let B64=false, binErr='';
+  let B64=false, binErr='', cue=[false,true];
+  try{ const c=JSON.parse(localStorage.getItem('tdj.hpcue')||'null'); if(Array.isArray(c)) cue=c; }catch(e){}
+  function uiCue(){ [0,1].forEach(i=>{ const b=$('hpc'+i); b.hidden=!enabled; b.classList.toggle('on',!!cue[i]); }); }
+  function setCue(c,tell){ cue=[!!c[0],!!c[1]]; try{ localStorage.setItem('tdj.hpcue',JSON.stringify(cue)); }catch(e){} uiCue(); if(tell&&dc&&dc.readyState==='open') dc.send(JSON.stringify({t:'cue',c:cue})); }
   let enabled=false, es=null, pc=null, dc=null, fc=null, nonce='', state='off', files=[null,null], fid=0, job=null, qrDone=false;
   const last=[{},{}];
   try{ enabled=localStorage.getItem('tdj.hp')==='1'; }catch(e){}
@@ -1695,10 +1703,11 @@ const HP=(()=>{
     nonce=n; setState('wait');
     pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
     dc=pc.createDataChannel('ctl'); fc=pc.createDataChannel('file'); fc.binaryType='arraybuffer'; fc.bufferedAmountLowThreshold=1<<18;
-    dc.onopen=()=>{ setState('on'); files=[null,null]; sendMix(); decks.forEach((d,i)=>{ last[i]={}; if(d.buffer) load(i); }); };
+    dc.onopen=()=>{ setState('on'); files=[null,null]; sendMix(); dc.send(JSON.stringify({t:'cue',c:cue})); decks.forEach((d,i)=>{ last[i]={}; if(d.buffer) load(i); }); };
     dc.onmessage=e=>{ let m; try{ m=JSON.parse(e.data); }catch(err){ return; }
       if(m.t==='ping') dc.send(JSON.stringify({t:'pong',a:m.a,b:performance.now()}));
-      else if(m.t==='need') load(m.deck,!!m.pcm); };
+      else if(m.t==='need') load(m.deck,!!m.pcm);
+      else if(m.t==='cue') setCue(m.c,false); };
     pc.onconnectionstatechange=()=>{ const s=pc.connectionState; if(s==='failed'||s==='disconnected'||s==='closed') setState('wait'); };
     const off=await pc.createOffer(); await pc.setLocalDescription(off);
     await new Promise(r=>{ if(pc.iceGatheringState==='complete') return r(); const t=setTimeout(r,2500);
@@ -1773,12 +1782,13 @@ const HP=(()=>{
     s.onload=()=>{ try{ const q=qrcode(0,'M'); q.addData(url); q.make(); $('hpQr').innerHTML='<img alt="QR" src="'+q.createDataURL(5,2)+'">'; }catch(e){} };
     s.onerror=()=>{ qrDone=false; }; document.head.appendChild(s); }
   function enable(on){ enabled=on; try{ localStorage.setItem('tdj.hp',on?'1':'0'); }catch(e){}
-    $('hpBox').hidden=!on;
+    $('hpBox').hidden=!on; uiCue();
     if(on){ listen(); qr(); setState(state==='on'?'on':'wait'); }
     else{ try{ es&&es.close(); }catch(e){} es=null; try{ pc&&pc.close(); }catch(e){} pc=dc=fc=null; setState('off'); } }
   $('hpCode').textContent=code; $('hpUrl').textContent=url;
   $('hpBtn').addEventListener('click',()=>{ if(!enabled) enable(true); });
   $('hpOff').addEventListener('click',()=>enable(false));
+  [0,1].forEach(i=>$('hpc'+i).addEventListener('click',()=>{ const c=cue.slice(); c[i]=!c[i]; setCue(c,true); }));
   if(enabled) enable(true); else setState('off');
   return {tick,load:i=>{ if(open()) load(i); },mix:sendMix};
 })();

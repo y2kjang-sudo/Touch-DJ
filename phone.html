@@ -167,6 +167,7 @@ function onCtl(m){
     else d.wait=0; }
   else if(m.t==='err'){ log('TV 전송 오류 ('+LET[m.deck]+'): '+m.msg); $('s'+m.deck).textContent='TV 전송 오류: '+m.msg; }
   else if(m.t==='mix'){ Object.assign(mix,m); applyMix(); }
+  else if(m.t==='cue'){ cueOn=[!!m.c[0],!!m.c[1]]; ls('tdj.hp.cue',JSON.stringify(cueOn)); ui(); applyHead(); }
 }
 function onFile(data){
   if(typeof data==='string'&&data.charCodeAt(0)===126){   // '~' + base64: TV browsers that cannot send binary
@@ -197,7 +198,8 @@ async function decode(x){
 
 /* ---------- UI ---------- */
 function ui(){ [0,1].forEach(i=>$('c'+i).classList.toggle('on',!!cueOn[i])); $('mx').value=MX; $('vol').value=VOL; $('vv').textContent=VOL; $('trim').textContent=(TRIM>0?'+':'')+TRIM+' ms'; }
-[0,1].forEach(i=>$('c'+i).addEventListener('click',()=>{ cueOn[i]=!cueOn[i]; ls('tdj.hp.cue',JSON.stringify(cueOn)); ui(); applyHead(); }));
+[0,1].forEach(i=>$('c'+i).addEventListener('click',()=>{ cueOn[i]=!cueOn[i]; ls('tdj.hp.cue',JSON.stringify(cueOn)); ui(); applyHead();
+  if(dc&&dc.readyState==='open') dc.send(JSON.stringify({t:'cue',c:cueOn})); }));
 $('mx').addEventListener('input',e=>{ MX=+e.target.value; ls('tdj.hp.mx',MX); applyHead(); });
 $('vol').addEventListener('input',e=>{ VOL=+e.target.value; ls('tdj.hp.vol',VOL); $('vv').textContent=VOL; applyHead(); });
 document.querySelectorAll('.trim [data-t]').forEach(b=>b.addEventListener('click',()=>{ TRIM+=+b.dataset.t; ls('tdj.hp.trim',TRIM); ui(); D.forEach(d=>{ d.lastRe=0; }); }));
