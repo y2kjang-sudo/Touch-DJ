@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>폰 모니터 테스트</title>
+<style>
+/* Feasibility test: TV page streams a click track to a phone over WebRTC on the same Wi-Fi
+   and measures how late it arrives. Signalling goes through ntfy.sh (public pub/sub, no server of our own). */
+:root{--bg:#08090b;--panel:#131417;--line:rgba(255,255,255,.08);--fg:#eceef2;--mu:#8d929c;--a:#ff9c3d;--b:#33d6cb;--ok:#3ee08a;--bad:#ff4f6a;--warn:#ffb648;color-scheme:dark}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;min-height:100vh;padding:24px 16px}
+h1{font-size:22px;font-weight:700;margin-bottom:4px}
+.sub{color:var(--mu);font-size:14px;margin-bottom:20px}
+.wrap{max-width:980px;margin:0 auto;display:grid;gap:16px}
+.tv .wrap{grid-template-columns:340px 1fr}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+.code{font:700 56px/1 ui-monospace,Menlo,monospace;letter-spacing:.12em;text-align:center;margin:8px 0 12px}
+.qr{display:flex;justify-content:center;background:#fff;border-radius:12px;padding:12px;min-height:40px}
+.qr img{width:220px;height:220px;image-rendering:pixelated}
+.hint{color:var(--mu);font-size:13px;margin-top:10px;word-break:break-all}
+.st{display:flex;align-items:center;gap:10px;font-weight:600}
+.st i{width:10px;height:10px;border-radius:50%;background:var(--mu);flex:none}
+.st.ok i{background:var(--ok);box-shadow:0 0 8px var(--ok)} .st.bad i{background:var(--bad)} .st.wait i{background:var(--warn)}
+.big{font:700 64px/1 ui-monospace,Menlo,monospace;margin:6px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+button{font:inherit;font-weight:700;color:var(--fg);background:#1d1f23;border:1px solid var(--line);border-radius:12px;height:52px;padding:0 20px;cursor:pointer}
+button.pri{background:var(--fg);color:#0b0c0e}
+button.on{border-color:var(--ok);color:var(--ok)}
+.chk{display:grid;grid-template-columns:1fr auto;gap:4px 16px;font-size:14px}
+.chk b{font-weight:600} .chk .y{color:var(--ok)} .chk .n{color:var(--bad)}
+input[type=range]{width:100%;accent-color:var(--a)}
+.lab{font-size:13px;color:var(--mu)}
+.log{font:12px/1.5 ui-monospace,Menlo,monospace;color:var(--mu);max-height:160px;overflow:auto;white-space:pre-wrap}
+.beat{display:flex;gap:8px;margin-top:8px} .beat span{flex:1;height:10px;border-radius:5px;background:#1d1f23} .beat span.on{background:var(--a)}
+.phone .wrap{max-width:480px}
+.phone .tap{width:100%;height:88px;font-size:22px}
+@media (max-width:760px){.tv .wrap{grid-template-columns:1fr}}
+</style></head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s), app=$('#app');
+const P=new URLSearchParams(location.hash.slice(1));
+const JOIN=P.get('j'), LOCAL=new URLSearchParams(location.search).has('local');
+const NTFY='https://ntfy.sh/';
+const logs=[]; function log(m){ logs.push(new Date().toLocaleTimeString()+' '+m); const el=$('#log'); if(el){ el.textContent=logs.slice(-40).join('\n'); el.scrollTop=1e9; } }
+const med=a=>{ const s=[...a].sort((x,y)=>x-y); return s.length?s[s.length>>1]:NaN; };
+
+/* ---------- signalling: tiny pub/sub over ntfy.sh (or BroadcastChannel for local tests) ---------- */
+function channel(topic,me,onMsg){
+  const seen=new Set(), parts={};
+  const handle=raw=>{ let m; try{ m=JSON.parse(raw); }catch(e){ return; }
+    if(!m||m.from===me||m.k!=='tdj') return;
+    if(m.n>1){ const p=parts[m.id]||(parts[m.id]=[]); p[m.i]=m.d; if(p.filter(x=>x!=null).length<m.n) return; m.d=p.join(''); delete parts[m.id]; }
+    if(seen.has(m.id)) return; seen.add(m.id);
+    let body; try{ body=JSON.parse(m.d); }catch(e){ return; } onMsg(body); };
+  let send;
+  if(LOCAL){ const bc=new BroadcastChannel(topic); bc.onmessage=e=>handle(e.data); send=s=>bc.postMessage(s); }
+  else{
+    const es=new EventSource(NTFY+topic+'/sse?since=5m');
+    es.onmessage=e=>{ try{ const j=JSON.parse(e.data); if(j.event==='message') handle(j.message); }catch(err){} };
+    es.onerror=()=>log('신호 서버 연결이 끊겼다가 다시 이어지는 중');
+    send=s=>fetch(NTFY+topic,{method:'POST',body:s}).catch(e=>log('신호 보내기 실패: '+e.message));
+  }
+  return obj=>{ const d=JSON.stringify(obj), id=Math.random().toString(36).slice(2,10), CH=3000, n=Math.ceil(d.length/CH)||1;
+    for(let i=0;i<n;i++) send(JSON.stringify({k:'tdj',from:me,id,i,n,d:d.slice(i*CH,(i+1)*CH)})); };
+}
+const ICE=LOCAL?[]:[{urls:'stun:stun.l.google.com:19302'}];
+function gathered(pc,ms){ return new Promise(r=>{ if(pc.iceGatheringState==='complete') return r();
+  const t=setTimeout(r,ms); pc.addEventListener('icegatheringstatechange',()=>{ if(pc.iceGatheringState==='complete'){ clearTimeout(t); r(); } }); }); }
+/* low-latency Opus: 10 ms packets, stereo allowed, no DTX */
+function tuneSdp(sdp){ return sdp.replace(/a=fmtp:(\d+) (.*minptime=\d+.*)/,(m,pt,p)=>'a=fmtp:'+pt+' '+p.replace(/;?stereo=\d/,'').replace(/;?usedtx=\d/,'')+';stereo=1;sprop-stereo=1;maxaveragebitrate=128000;usedtx=0')
+  .replace(/a=ptime:\d+/g,'').replace(/(m=audio.*\r\n)/,'$1a=ptime:10\r\n'); }
+
+/* ================================ TV (host) ================================ */
+function tv(){
+  document.body.className='tv';
+  const code=String(Math.floor(100000+Math.random()*900000)), topic='touchdj-mon-'+code;
+  const joinUrl=location.href.split('#')[0]+'#j='+code;
+  const feat=[['WebRTC (RTCPeerConnection)',!!window.RTCPeerConnection],['Web Audio 스트림 출력',!!(window.AudioContext&&AudioContext.prototype.createMediaStreamDestination)],
+    ['신호 서버 접속 (EventSource)',!!window.EventSource],['데이터 채널',!!(window.RTCPeerConnection&&RTCPeerConnection.prototype.createDataChannel)]];
+  app.innerHTML=`
+  <div><h1>폰 모니터 테스트 · TV</h1><div class="sub">폰으로 이 화면의 QR을 찍거나 아래 주소를 열어 주세요. 같은 와이파이여야 해요.</div>
+   <div class="card"><div class="lab">연결 코드</div><div class="code">${code}</div><div class="qr" id="qr"><span style="color:#000">QR 불러오는 중…</span></div>
+   <div class="hint">${joinUrl}</div></div>
+   <div class="card" style="margin-top:16px"><div class="lab" style="margin-bottom:8px">이 TV 브라우저 지원 여부</div><div class="chk">${feat.map(([k,v])=>`<b>${k}</b><span class="${v?'y':'n'}">${v?'됨':'안 됨'}</span>`).join('')}</div></div></div>
+  <div style="display:grid;gap:16px;align-content:start">
+   <div class="card"><div class="st wait" id="st"><i></i><span>폰을 기다리는 중</span></div>
+     <div class="row"><button class="pri" id="go">메트로놈 시작</button><button id="spk" class="on">TV 스피커 켜짐</button></div>
+     <div class="beat" id="beat"><span></span><span></span><span></span><span></span></div></div>
+   <div class="card"><div class="lab">폰에 소리가 도착하는 지연 (폰에서 잰 값)</div><div class="big" id="lat">— ms</div>
+     <div class="lab" id="latd">폰이 연결되고 메트로놈을 켜면 재기 시작해요.</div></div>
+   <div class="card"><div class="lab">귀로 맞춰 보기: TV 스피커를 늦춰서 폰 소리와 딸깍이 겹치게 해 보세요</div>
+     <div class="row" style="margin-top:4px"><input type="range" id="dl" min="0" max="400" step="5" value="0"></div><div class="lab"><span id="dlv">0</span> ms 늦춤 · 다시 맞추기:
+     <button id="auto" style="height:36px;padding:0 12px">잰 값으로 맞추기</button></div></div>
+   <div class="card"><div class="lab">기록</div><div class="log" id="log"></div></div>
+  </div>`;
+  const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js';
+  s.onload=()=>{ try{ const q=qrcode(0,'M'); q.addData(joinUrl); q.make(); $('#qr').innerHTML='<img alt="QR" src="'+q.createDataURL(6,2)+'">'; }catch(e){ $('#qr').innerHTML='<span style="color:#000">QR을 못 만들었어요. 주소를 직접 입력해 주세요.</span>'; } };
+  s.onerror=()=>{ $('#qr').innerHTML='<span style="color:#000">QR을 못 불러왔어요. 주소를 직접 입력해 주세요.</span>'; };
+  document.head.appendChild(s);
+
+  let ctx,dest,spkGain,spkDelay,running=false,timer=null,next=0,beatN=0,pc=null,dc=null,lastLat=NaN;
+  function audio(){
+    if(ctx) return; const AC=window.AudioContext||window.webkitAudioContext; ctx=new AC({latencyHint:'interactive'});
+    dest=ctx.createMediaStreamDestination(); spkDelay=ctx.createDelay(1); spkGain=ctx.createGain();
+    spkDelay.connect(spkGain); spkGain.connect(ctx.destination);
+  }
+  function click(t,accent){
+    const o=ctx.createOscillator(), g=ctx.createGain(); o.frequency.value=accent?1760:880;
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.9,t+.001); g.gain.exponentialRampToValueAtTime(.001,t+.06);
+    o.connect(g); g.connect(dest); g.connect(spkDelay); o.start(t); o.stop(t+.07);
+  }
+  function tick(){
+    while(next<ctx.currentTime+.15){
+      const accent=beatN%4===0; click(next,accent);
+      // tell the phone when this click left the TV's audio graph, in TV performance.now() time
+      if(dc&&dc.readyState==='open'){ const ts=ctx.getOutputTimestamp?ctx.getOutputTimestamp():null;
+        const perf=ts&&ts.performanceTime?ts.performanceTime+(next-ts.contextTime)*1000:performance.now()+(next-ctx.currentTime)*1000;
+        dc.send(JSON.stringify({t:'click',at:perf,n:beatN})); }
+      const k=beatN%4, d=(next-ctx.currentTime)*1000; setTimeout(()=>{ document.querySelectorAll('#beat span').forEach((e,j)=>e.classList.toggle('on',j===k)); },Math.max(0,d));
+      next+=.5; beatN++;
+    }
+  }
+  $('#go').onclick=()=>{ audio(); ctx.resume();
+    if(running){ running=false; clearInterval(timer); $('#go').textContent='메트로놈 시작'; return; }
+    running=true; next=ctx.currentTime+.1; timer=setInterval(tick,25); $('#go').textContent='메트로놈 멈춤'; };
+  $('#spk').onclick=()=>{ audio(); const on=spkGain.gain.value<.5; spkGain.gain.value=on?1:0; $('#spk').classList.toggle('on',on); $('#spk').textContent=on?'TV 스피커 켜짐':'TV 스피커 꺼짐'; };
+  const setDl=v=>{ audio(); $('#dl').value=v; $('#dlv').textContent=v; spkDelay.delayTime.value=v/1000; };
+  $('#dl').oninput=e=>setDl(+e.target.value);
+  $('#auto').onclick=()=>{ if(isFinite(lastLat)) setDl(Math.round(lastLat/5)*5); };
+
+  const st=(cls,txt)=>{ $('#st').className='st '+cls; $('#st span').textContent=txt; };
+  const send=channel(topic,'tv',async m=>{
+    if(m.t==='hello'){ log('폰이 연결을 요청했어요'); audio(); await connect(); }
+    else if(m.t==='answer'&&pc){ await pc.setRemoteDescription({type:'answer',sdp:m.sdp}); log('폰 응답 받음, 연결 중'); }
+  });
+  async function connect(){
+    if(pc){ try{ pc.close(); }catch(e){} }
+    pc=new RTCPeerConnection({iceServers:ICE});
+    dest.stream.getAudioTracks().forEach(t=>pc.addTrack(t,dest.stream));
+    dc=pc.createDataChannel('ctl'); dc.onopen=()=>log('데이터 채널 열림');
+    dc.onmessage=e=>{ const m=JSON.parse(e.data);
+      if(m.t==='ping') dc.send(JSON.stringify({t:'pong',a:m.a,b:performance.now()}));
+      else if(m.t==='lat'){ lastLat=m.total; $('#lat').textContent=Math.round(m.total)+' ms';
+        $('#latd').textContent=`네트워크·버퍼 ${Math.round(m.net)} ms + 폰 출력 ${Math.round(m.out)} ms · 흔들림 ±${Math.round(m.jit)} ms · 시계 오차 ±${Math.round(m.rtt/2)} ms`; } };
+    pc.onconnectionstatechange=()=>{ const s=pc.connectionState; log('연결 상태: '+s);
+      if(s==='connected') st('ok','폰과 연결됐어요'); else if(s==='failed'||s==='disconnected') st('bad','연결이 끊겼어요. 폰에서 다시 연결해 주세요'); else st('wait','연결 중…'); };
+    const off=await pc.createOffer(); await pc.setLocalDescription({type:'offer',sdp:tuneSdp(off.sdp)});
+    await gathered(pc,2500); send({t:'offer',sdp:pc.localDescription.sdp}); log('연결 제안 보냄');
+  }
+  log('코드 '+code+' 로 폰을 기다려요');
+}
+
+/* ================================ phone ================================ */
+function phone(){
+  document.body.className='phone';
+  const topic='touchdj-mon-'+JOIN;
+  app.innerHTML=`<div><h1>폰 모니터 테스트 · 폰</h1><div class="sub">연결 코드 ${JOIN} · TV와 같은 와이파이에서 열어 주세요. 유선 이어폰을 쓰면 가장 정확해요.</div></div>
+   <div class="card"><button class="tap pri" id="tap">탭해서 연결</button><div class="st wait" id="st" style="margin-top:14px"><i></i><span>대기 중</span></div></div>
+   <div class="card"><div class="lab">TV에서 이 폰까지 걸리는 시간</div><div class="big" id="lat">— ms</div><div class="lab" id="latd">TV에서 메트로놈을 켜면 재기 시작해요.</div></div>
+   <div class="card"><div class="lab">기록</div><div class="log" id="log"></div></div>`;
+  let pc,dc,ctx,an,buf,el,offs=[],arrivals=[],sent={},nets=[];
+  const st=(cls,txt)=>{ $('#st').className='st '+cls; $('#st span').textContent=txt; };
+  const send=channel(topic,'ph',async m=>{
+    if(m.t!=='offer') return; log('TV의 연결 제안 받음');
+    pc=new RTCPeerConnection({iceServers:ICE});
+    pc.ontrack=e=>{ const stream=e.streams[0]||new MediaStream([e.track]);
+      try{ e.receiver.jitterBufferTarget=0; }catch(err){} try{ e.receiver.playoutDelayHint=0; }catch(err){}
+      el=new Audio(); el.autoplay=true; el.playsInline=true; el.srcObject=stream; el.play().catch(()=>log('재생하려면 화면을 한 번 더 탭해 주세요'));
+      const src=ctx.createMediaStreamSource(stream); an=ctx.createAnalyser(); an.fftSize=256; buf=new Float32Array(an.fftSize); src.connect(an);
+      watch(); log('소리 받는 중'); };
+    pc.ondatachannel=e=>{ dc=e.channel; dc.onopen=()=>{ log('데이터 채널 열림'); ping(); };
+      dc.onmessage=ev=>{ const m=JSON.parse(ev.data);
+        if(m.t==='pong'){ const now=performance.now(), rtt=now-m.a; offs.push({off:m.b-(m.a+rtt/2),rtt}); if(offs.length>30) offs.shift(); }
+        else if(m.t==='click'){ sent[m.n]=m.at; } }; };
+    pc.onconnectionstatechange=()=>{ const s=pc.connectionState; log('연결 상태: '+s);
+      if(s==='connected') st('ok','TV와 연결됐어요'); else if(s==='failed'||s==='disconnected') st('bad','연결이 끊겼어요. 다시 탭해 주세요'); else st('wait','연결 중…'); };
+    await pc.setRemoteDescription({type:'offer',sdp:m.sdp});
+    const ans=await pc.createAnswer(); await pc.setLocalDescription({type:'answer',sdp:tuneSdp(ans.sdp)});
+    await gathered(pc,2500); send({t:'answer',sdp:pc.localDescription.sdp}); log('응답 보냄');
+  });
+  function ping(){ if(!dc||dc.readyState!=='open') return; dc.send(JSON.stringify({t:'ping',a:performance.now()})); setTimeout(ping,offs.length<10?150:1000); }
+  function clock(){ const best=[...offs].sort((a,b)=>a.rtt-b.rtt).slice(0,5); return best.length?{off:med(best.map(x=>x.off)),rtt:med(best.map(x=>x.rtt))}:null; }
+  // onset detection on the received stream; each detected click is paired with the TV send time of the nearest click
+  function watch(){
+    let armed=true, quietSince=0;
+    setInterval(()=>{ if(!an) return; an.getFloatTimeDomainData(buf); let pk=0; for(let i=0;i<buf.length;i++){ const v=Math.abs(buf[i]); if(v>pk) pk=v; }
+      const now=performance.now();
+      if(armed&&pk>.25){ armed=false; quietSince=0; arrive(now); }
+      else if(!armed&&pk<.05){ if(!quietSince) quietSince=now; else if(now-quietSince>80) armed=true; }
+    },4);
+  }
+  function arrive(now){
+    const c=clock(); if(!c) return;
+    const tvNow=now+c.off; let best=null;
+    for(const n in sent){ const d=tvNow-sent[n]; if(d>-20&&d<1500&&(best==null||d<best)) best=d; if(tvNow-sent[n]>5000) delete sent[n]; }
+    if(best==null) return;
+    nets.push(best); if(nets.length>16) nets.shift(); window.__nets=nets.slice();
+    const net=med(nets), jit=med(nets.map(x=>Math.abs(x-net))), out=((ctx.outputLatency||0)+(ctx.baseLatency||0))*1000, total=net+out;
+    $('#lat').textContent=Math.round(total)+' ms';
+    $('#latd').textContent=`네트워크·버퍼 ${Math.round(net)} ms + 폰 출력 ${Math.round(out)} ms · 흔들림 ±${Math.round(jit)} ms`;
+    if(dc&&dc.readyState==='open') dc.send(JSON.stringify({t:'lat',net,out,total,jit,rtt:c.rtt}));
+  }
+  $('#tap').onclick=()=>{ const AC=window.AudioContext||window.webkitAudioContext; if(!ctx) ctx=new AC({latencyHint:'interactive'}); ctx.resume();
+    if(el) el.play().catch(()=>{});
+    if(pc&&pc.connectionState==='connected') return;
+    offs=[]; nets=[]; sent={}; st('wait','TV를 찾는 중…'); send({t:'hello'}); log('TV에 연결 요청'); $('#tap').textContent='다시 연결'; };
+}
+JOIN?phone():tv();
+window.__mon={logs,get nets(){return window.__nets}};
+})();
+</script>
+</body></html>
