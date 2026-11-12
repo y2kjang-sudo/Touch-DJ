@@ -165,14 +165,16 @@ function onCtl(m){
     const now=performance.now();
     if(m.id&&m.id!==d.id&&!d.dec&&!(inc&&inc.deck===m.deck)){ if(!d.wait) d.wait=now; else if(now-d.wait>4000&&now-(d.asked||0)>8000){ d.asked=now; d.wait=0; log(LET[m.deck]+' 곡이 안 와서 다시 요청'); dc.send(JSON.stringify({t:'need',deck:m.deck})); } }
     else d.wait=0; }
-  else if(m.t==='err'){ log('TV 전송 오류 ('+LET[m.deck]+'): '+m.msg); }
+  else if(m.t==='err'){ log('TV 전송 오류 ('+LET[m.deck]+'): '+m.msg); $('s'+m.deck).textContent='TV 전송 오류: '+m.msg; }
   else if(m.t==='mix'){ Object.assign(mix,m); applyMix(); }
 }
 function onFile(data){
+  if(typeof data==='string'&&data.charCodeAt(0)===126){   // '~' + base64: TV browsers that cannot send binary
+    const bin=atob(data.slice(1)), u=new Uint8Array(bin.length); for(let k=0;k<bin.length;k++) u[k]=bin.charCodeAt(k); data=u.buffer; }
   if(typeof data==='string'){ const m=JSON.parse(data), d=D[m.deck];
     if(m.t==='file'){ log(LET[m.deck]+' 받기 시작: '+(m.name||'')+' ('+(m.size/1e6).toFixed(1)+' MB)'); inc={deck:m.deck,id:m.id,size:m.size,got:0,parts:[],t0:performance.now()}; stop(d); d.buf=null; d.id=0;
       $('t'+m.deck).textContent=m.name||'—'; $('s'+m.deck).textContent='받는 중 0%'; $('b'+m.deck).style.width='0'; }
-    else if(m.t==='end'&&inc&&inc.id===m.id){ const x=inc; inc=null; log(LET[x.deck]+' 다 받음 ('+((performance.now()-x.t0)/1000).toFixed(1)+'초), 여는 중'); decode(x); }
+    else if(m.t==='end'&&inc&&inc.id===m.id){ const x=inc; inc=null; log(LET[x.deck]+' 다 받음 ('+((performance.now()-x.t0)/1000).toFixed(1)+'초'+(m.b64?', 텍스트 방식':'')+'), 여는 중'); decode(x); }
     return; }
   if(!inc) return; inc.parts.push(data); inc.got+=data.byteLength;
   const pct=Math.round(inc.got/inc.size*100); if(pct!==inc.pct){ inc.pct=pct; $('s'+inc.deck).textContent='받는 중 '+pct+'%'; $('b'+inc.deck).style.width=pct+'%'; }

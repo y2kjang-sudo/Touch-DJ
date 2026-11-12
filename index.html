@@ -1011,7 +1011,8 @@ async function expandTar(file){
     else if(type!=='g'){
       if(type==='0'||type==='7'){ const p=(paxPath||longName||name).replace(/^\.\//,''), base=p.split('/').pop();
         if(base&&!base.startsWith('._')&&!/(^|\/)__MACOSX\//.test(p)){ const o=dataOff, sz=size;
-          out.push({name:base,webkitRelativePath:p,size:sz,arrayBuffer:()=>file.slice(o,o+sz).arrayBuffer()}); } }
+          out.push({name:base,webkitRelativePath:p,size:sz,arrayBuffer:()=>file.slice(o,o+sz).arrayBuffer(),
+            slice:(a,b)=>file.slice(o+Math.max(0,a||0),o+Math.min(sz,b==null?sz:b))}); } }
       paxPath=null; longName=null;
     }
     off=dataOff+Math.ceil(size/512)*512; if(off>N){ bad=true; break; }
@@ -1673,6 +1674,7 @@ const HP=(()=>{
   let code=''; try{ code=localStorage.getItem('tdj.hpcode')||''; }catch(e){}
   if(!/^\d{6}$/.test(code)){ code=String(Math.floor(100000+Math.random()*900000)); try{ localStorage.setItem('tdj.hpcode',code); }catch(e){} }
   const topic='touchdj-hp-'+code, url=PHONE+'#j='+code;
+  let B64=false, binErr='';
   let enabled=false, es=null, pc=null, dc=null, fc=null, nonce='', state='off', files=[null,null], fid=0, job=null, qrDone=false;
   const last=[{},{}];
   try{ enabled=localStorage.getItem('tdj.hp')==='1'; }catch(e){}
@@ -1714,7 +1716,8 @@ const HP=(()=>{
     return new Blob([out.buffer],{type:'audio/wav'}); }
   function load(i,pcm){
     const d=decks[i]; if(!open()||!d.buffer) return;
-    const blob=(!pcm&&d.track&&d.track.file)?d.track.file:wav(d.buffer);
+    let blob=(!pcm&&d.track&&d.track.file)?d.track.file:wav(d.buffer);
+    if(typeof blob.slice!=='function'){ const f=blob; blob={size:f.size,slice:(a,b)=>({arrayBuffer:async()=>(await f.arrayBuffer()).slice(a,b)})}; }
     files[i]=++fid; if(job&&job.deck===i) job.stop=true;
     const j={deck:i,id:fid,blob,stop:false}; (async()=>{ while(job&&!job.done) await new Promise(r=>setTimeout(r,50)); if(j.stop||files[i]!==j.id) return; job=j;
       try{ await push(j); }catch(e){ setT($('hpx'+i),'실패'); try{ dc.send(JSON.stringify({t:'err',deck:i,msg:String(e&&e.message||e)})); }catch(err){} }
@@ -1732,11 +1735,15 @@ const HP=(()=>{
       for(let o=0;o<ab.byteLength&&!j.stop;o+=16384){
         if(fc.readyState!=='open'){ j.stop=true; break; }
         while(fc.readyState==='open'&&fc.bufferedAmount>(1<<20)) await new Promise(r=>setTimeout(r,8));   // polling: some TV browsers never fire bufferedamountlow
-        fc.send(ab.slice(o,Math.min(ab.byteLength,o+16384)));
+        const piece=ab.slice(o,Math.min(ab.byteLength,o+16384));
+        if(!B64){ try{ fc.send(piece); continue; }catch(e){ B64=true; binErr=String(e&&e.message||e); } }
+        // fallback for browsers whose data channel refuses binary: the same bytes as base64 text (about a third larger)
+        const u=new Uint8Array(piece); let bin=''; for(let k=0;k<u.length;k+=4096) bin+=String.fromCharCode.apply(null,u.subarray(k,k+4096));
+        fc.send('~'+btoa(bin));
       }
       if(j.deck!==undefined) setT($('hpx'+j.deck),Math.round(Math.min(1,(a+(1<<20))/size)*100)+'%');
     }
-    if(!j.stop&&fc.readyState==='open') fc.send(JSON.stringify({t:'end',deck:j.deck,id:j.id}));
+    if(!j.stop&&fc.readyState==='open') fc.send(JSON.stringify({t:'end',deck:j.deck,id:j.id,b64:B64,why:binErr}));
   }
   /* --- deck state: position at the moment the TV speaker plays it, in TV performance.now() time --- */
   function posAt(d,T){ if(!d.buffer) return 0; if(!d.playing||!ctx) return d.offset;
