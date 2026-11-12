@@ -69,9 +69,8 @@ function channel(topic,me,onMsg){
 const ICE=LOCAL?[]:[{urls:'stun:stun.l.google.com:19302'}];
 function gathered(pc,ms){ return new Promise(r=>{ if(pc.iceGatheringState==='complete') return r();
   const t=setTimeout(r,ms); pc.addEventListener('icegatheringstatechange',()=>{ if(pc.iceGatheringState==='complete'){ clearTimeout(t); r(); } }); }); }
-/* low-latency Opus: 10 ms packets, stereo allowed, no DTX */
-function tuneSdp(sdp){ return sdp.replace(/a=fmtp:(\d+) (.*minptime=\d+.*)/,(m,pt,p)=>'a=fmtp:'+pt+' '+p.replace(/;?stereo=\d/,'').replace(/;?usedtx=\d/,'')+';stereo=1;sprop-stereo=1;maxaveragebitrate=128000;usedtx=0')
-  .replace(/a=ptime:\d+/g,'').replace(/(m=audio.*\r\n)/,'$1a=ptime:10\r\n'); }
+/* Opus: stereo allowed, no DTX (silence suppression would add glitches around clicks) */
+function tuneSdp(sdp){ return sdp.replace(/a=fmtp:(\d+) (.*minptime=\d+.*)/,(m,pt,p)=>'a=fmtp:'+pt+' '+p.replace(/;?stereo=\d/,'').replace(/;?usedtx=\d/,'')+';stereo=1;sprop-stereo=1;maxaveragebitrate=128000;usedtx=0'); }
 
 /* ================================ TV (host) ================================ */
 function tv(){
@@ -90,9 +89,9 @@ function tv(){
      <div class="row"><button class="pri" id="go">메트로놈 시작</button><button id="spk" class="on">TV 스피커 켜짐</button></div>
      <div class="beat" id="beat"><span></span><span></span><span></span><span></span></div></div>
    <div class="card"><div class="lab">폰에 소리가 도착하는 지연 (폰에서 잰 값)</div><div class="big" id="lat">— ms</div>
-     <div class="lab" id="latd">폰이 연결되고 메트로놈을 켜면 재기 시작해요.</div></div>
+     <div class="lab" id="latd">폰이 연결되고 메트로놈을 켜면 재기 시작해요.</div><div class="lab" id="q" style="margin-top:8px">끊김: —</div></div>
    <div class="card"><div class="lab">귀로 맞춰 보기: TV 스피커를 늦춰서 폰 소리와 딸깍이 겹치게 해 보세요</div>
-     <div class="row" style="margin-top:4px"><input type="range" id="dl" min="0" max="400" step="5" value="0"></div><div class="lab"><span id="dlv">0</span> ms 늦춤 · 다시 맞추기:
+     <div class="row" style="margin-top:4px"><input type="range" id="dl" min="0" max="800" step="5" value="0"></div><div class="lab"><span id="dlv">0</span> ms 늦춤 · 다시 맞추기:
      <button id="auto" style="height:36px;padding:0 12px">잰 값으로 맞추기</button></div></div>
    <div class="card"><div class="lab">기록</div><div class="log" id="log"></div></div>
   </div>`;
@@ -143,6 +142,7 @@ function tv(){
     dc=pc.createDataChannel('ctl'); dc.onopen=()=>log('데이터 채널 열림');
     dc.onmessage=e=>{ const m=JSON.parse(e.data);
       if(m.t==='ping') dc.send(JSON.stringify({t:'pong',a:m.a,b:performance.now()}));
+      else if(m.t==='q'){ $('#q').textContent='폰 버퍼 '+m.buf+' ms · '+m.txt; $('#q').style.color=m.pct>2?'var(--bad)':m.pct>0.3?'var(--warn)':'var(--ok)'; }
       else if(m.t==='lat'){ lastLat=m.total; $('#lat').textContent=Math.round(m.total)+' ms';
         $('#latd').textContent=`네트워크·버퍼 ${Math.round(m.net)} ms + 폰 출력 ${Math.round(m.out)} ms · 흔들림 ±${Math.round(m.jit)} ms · 시계 오차 ±${Math.round(m.rtt/2)} ms`; } };
     pc.onconnectionstatechange=()=>{ const s=pc.connectionState; log('연결 상태: '+s);
@@ -159,15 +159,31 @@ function phone(){
   const topic='touchdj-mon-'+JOIN;
   app.innerHTML=`<div><h1>폰 모니터 테스트 · 폰</h1><div class="sub">연결 코드 ${JOIN} · TV와 같은 와이파이에서 열어 주세요. 유선 이어폰을 쓰면 가장 정확해요.</div></div>
    <div class="card"><button class="tap pri" id="tap">탭해서 연결</button><div class="st wait" id="st" style="margin-top:14px"><i></i><span>대기 중</span></div></div>
+   <div class="card"><div class="lab">폰 대기 버퍼 · 소리가 끊기면 늘리고, 안 끊기면 줄여 보세요</div>
+     <div class="row" id="bufs">${[0,40,80,120,200,300].map(v=>`<button data-v="${v}" style="height:44px;padding:0 14px">${v}</button>`).join('')}</div>
+     <div class="lab" id="q" style="margin-top:10px">끊김: —</div></div>
    <div class="card"><div class="lab">TV에서 이 폰까지 걸리는 시간</div><div class="big" id="lat">— ms</div><div class="lab" id="latd">TV에서 메트로놈을 켜면 재기 시작해요.</div></div>
    <div class="card"><div class="lab">기록</div><div class="log" id="log"></div></div>`;
-  let pc,dc,ctx,an,buf,el,offs=[],arrivals=[],sent={},nets=[];
+  let pc,dc,ctx,an,buf,el,rx=null,offs=[],arrivals=[],sent={},nets=[],BUF=80,prev=null,qtxt='';
+  try{ BUF=+(localStorage.getItem('tdj.monbuf')||80); }catch(e){}
+  const applyBuf=()=>{ if(rx){ try{ rx.jitterBufferTarget=BUF; }catch(e){} try{ rx.playoutDelayHint=BUF/1000; }catch(e){} }
+    document.querySelectorAll('#bufs button').forEach(b=>b.classList.toggle('on',+b.dataset.v===BUF)); nets=[]; };
+  document.querySelectorAll('#bufs button').forEach(b=>b.onclick=()=>{ BUF=+b.dataset.v; try{ localStorage.setItem('tdj.monbuf',BUF); }catch(e){} applyBuf(); log('버퍼 '+BUF+' ms'); });
+  applyBuf();
+  /* every second: share of audio the phone had to fill in because packets came late or not at all */
+  setInterval(async()=>{ if(!pc||!rx) return; let r=null; try{ (await rx.getStats()).forEach(x=>{ if(x.type==='inbound-rtp'&&x.kind==='audio') r=x; }); }catch(e){} if(!r) return;
+    if(prev&&r.totalSamplesReceived>prev.totalSamplesReceived){ const n=r.totalSamplesReceived-prev.totalSamplesReceived, c=(r.concealedSamples||0)-(prev.concealedSamples||0);
+      const lost=(r.packetsLost||0)-(prev.packetsLost||0), jb=r.jitterBufferEmittedCount>prev.jitterBufferEmittedCount?((r.jitterBufferDelay-prev.jitterBufferDelay)/(r.jitterBufferEmittedCount-prev.jitterBufferEmittedCount))*1000:NaN;
+      const pct=Math.max(0,c/n*100); qtxt='끊김 '+pct.toFixed(1)+'% · 잃은 패킷 '+lost+' · 실제 버퍼 '+(isFinite(jb)?Math.round(jb)+' ms':'—');
+      $('#q').textContent=qtxt; $('#q').style.color=pct>2?'var(--bad)':pct>0.3?'var(--warn)':'var(--ok)';
+      if(dc&&dc.readyState==='open') dc.send(JSON.stringify({t:'q',txt:qtxt,pct,buf:BUF})); }
+    prev=r; },1000);
   const st=(cls,txt)=>{ $('#st').className='st '+cls; $('#st span').textContent=txt; };
   const send=channel(topic,'ph',async m=>{
     if(m.t!=='offer') return; log('TV의 연결 제안 받음');
     pc=new RTCPeerConnection({iceServers:ICE});
     pc.ontrack=e=>{ const stream=e.streams[0]||new MediaStream([e.track]);
-      try{ e.receiver.jitterBufferTarget=0; }catch(err){} try{ e.receiver.playoutDelayHint=0; }catch(err){}
+      rx=e.receiver; prev=null; applyBuf();
       el=new Audio(); el.autoplay=true; el.playsInline=true; el.srcObject=stream; el.play().catch(()=>log('재생하려면 화면을 한 번 더 탭해 주세요'));
       const src=ctx.createMediaStreamSource(stream); an=ctx.createAnalyser(); an.fftSize=256; buf=new Float32Array(an.fftSize); src.connect(an);
       watch(); log('소리 받는 중'); };
