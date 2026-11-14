@@ -310,6 +310,7 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 .mini.hpc.on{background:var(--c);border-color:var(--c);color:var(--bg)}
 .ctl .mini.hpc.on{background:#0b0c0e;color:var(--c);border-color:var(--c)} .ctl .mini.hpc.on::before{background:var(--c);box-shadow:0 0 6px var(--c)}
 .crow .mini.hpc{margin-left:auto;margin-right:8px}
+.tvs{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ok);border:1px solid var(--ok);border-radius:4px;padding:0 4px;margin-left:8px;vertical-align:2px}
 .hph{display:flex;gap:14px;align-items:center;justify-content:space-between}
 .hpbox{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;margin-top:10px}
 .hpq{background:#fff;border-radius:10px;padding:6px;min-width:120px;min-height:120px;display:flex;align-items:center;justify-content:center}
@@ -451,7 +452,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v21</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v22</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -466,6 +467,8 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
     <div class="srow col"><div class="hph"><div><b>폰 헤드폰</b><span>같은 와이파이나 폰 핫스팟에 있는 폰으로 다음 곡을 미리 들어요. 스피커는 스테레오 그대로예요.</span></div><button class="hb" id="hpBtn">켜기</button></div>
       <div class="hpbox" id="hpBox" hidden><div class="hpq" id="hpQr"><span>QR 불러오는 중…</span></div>
         <div class="hpi"><span>연결 코드</span><b id="hpCode"></b><span id="hpUrl" class="hpu"></span><span id="hpSt"></span><span>곡 전송 · 덱 A <em id="hpx0">—</em> · 덱 B <em id="hpx1">—</em></span><button class="hb" id="hpOff">끄기</button></div></div></div>
+    <div class="srow col"><div class="hph"><div><b>TV에 저장</b><span>덱에 올린 곡과 렉박 목록을 TV에 저장해서, 앱을 나갔다 와도 USB를 다시 고르지 않고 바로 써요. 공간이 모자라면 오래 안 쓴 곡부터 지워요.</span></div><button class="hb on" id="autoSave">켜짐</button></div>
+      <span id="stInfo" style="margin-top:8px">확인 중…</span><div style="display:flex;gap:8px;margin-top:8px"><button class="hb" id="stClear">저장된 곡·목록 모두 지우기</button></div></div>
     <div class="srow"><div><b>터치하면 전체화면</b><span>화면을 터치하면 전체화면으로 바꿔서 주소창이 내려오지 않게 해요. 리모컨 뒤로가기로 빠져나와도 다음 터치에 다시 전체화면이 돼요.</span></div><button class="hb" id="afsBtn">켜짐</button></div>
     <div class="srow"><div><b>가벼운 모드</b><span>파형 해상도를 낮춰 TV에서 더 부드럽게 움직여요. 스탠바이미에서는 처음부터 켜져 있어요.</span></div><button class="hb" id="perfBtn">켜짐</button></div>
     <div class="srow col"><div><b>기기 정보</b><span id="uaInfo"></span></div></div>
@@ -497,6 +500,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
           <button class="hb" id="mOnly">어울리는 곡만</button>
           <label class="hb" id="pickFolderBtn" for="pickDir">폴더 고르기</label>
           <label class="hb" id="pickFilesBtn" for="pickFiles">파일 고르기</label>
+          <button class="hb" id="saveView">TV에 저장</button>
           <button class="hb pri" id="closeLib">닫기</button>
         </div>
         <div class="diag" id="diag" hidden></div>
@@ -964,6 +968,103 @@ const demoTracks=demoSpecs.map((s,k)=>({uid:'demo'+k,src:'demo',demo:k,title:s.t
 const demoBufs=[];
 let lib={kind:'demo',tracks:[],views:[],allFiles:[],label:'',parts:new Map()};
 let curView='demo', libBusy=false;
+/* ================= TV storage =================
+   The TV browser loses access to picked files when the app is left, so what was read is kept in the
+   browser's own storage (IndexedDB): the library (tracks, playlists, cues, beatgrids) and the song files of
+   tracks that were loaded or saved on purpose. Least recently used songs make room when space runs short. */
+const STORE=(()=>{
+  let dbp=null, keys=new Map(), autosave=true, persisted=false, bulk=null;
+  try{ autosave=localStorage.getItem('tdj.autosave')!=='0'; }catch(e){}
+  function db(){ if(dbp) return dbp;
+    dbp=new Promise((res,rej)=>{ let r; try{ r=indexedDB.open('touchdj',1); }catch(e){ return rej(e); }
+      r.onupgradeneeded=()=>{ const d=r.result; ['kv','files','fmeta'].forEach(n=>{ if(!d.objectStoreNames.contains(n)) d.createObjectStore(n); }); };
+      r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+    dbp.catch(()=>{ dbp=null; }); return dbp; }
+  async function tx(store,mode,fn){ const d=await db();
+    return new Promise((res,rej)=>{ const t=d.transaction(store,mode), r=fn(t.objectStore(store)); let out;
+      if(r) r.onsuccess=()=>{ out=r.result; }; t.oncomplete=()=>res(out); t.onerror=t.onabort=()=>rej(t.error); }); }
+  const get=(s,k)=>tx(s,'readonly',o=>o.get(k)), put=(s,k,v)=>tx(s,'readwrite',o=>o.put(v,k)), del=(s,k)=>tx(s,'readwrite',o=>o.delete(k));
+  async function loadKeys(){ try{ const all=await tx('fmeta','readonly',o=>o.getAll()); keys=new Map((all||[]).map(m=>[m.key,m])); }catch(e){} return keys; }
+  const ready=loadKeys();
+  /* a stored song behaves like a picked file: arrayBuffer() and slice() read it back from storage */
+  function fileOf(m){ let bp=null;
+    const blob=()=>bp||(bp=get('files',m.key).then(b=>{ if(!b) throw new Error('저장된 곡이 없어요'); touch(m.key); return b; }));
+    return {name:m.name,size:m.size,cached:true,webkitRelativePath:m.key,
+      arrayBuffer:async()=>(await blob()).arrayBuffer(), slice:(a,b)=>({arrayBuffer:async()=>(await blob()).slice(a,b).arrayBuffer()})}; }
+  function attach(tracks){ let n=0; tracks.forEach(t=>{ const m=t.ck&&keys.get(t.ck);
+    if(!m) return; n++; t.cached=true; if(!t.file) t.file=fileOf(m); }); return n; }
+  let touchT=new Map();
+  function touch(k){ const m=keys.get(k); if(!m) return; m.used=Date.now(); clearTimeout(touchT.get(k)); touchT.set(k,setTimeout(()=>put('fmeta',k,m).catch(()=>{}),3000)); }
+  async function room(need){
+    if(!navigator.storage||!navigator.storage.estimate) return true;
+    let {usage,quota}=await navigator.storage.estimate(); const limit=quota*.85;
+    if(usage+need<=limit) return true;
+    const inUse=new Set(decks.map(d=>d.track&&d.track.ck).filter(Boolean));
+    const old=[...keys.values()].filter(m=>!inUse.has(m.key)).sort((a,b)=>a.used-b.used);
+    for(const m of old){ if(usage+need<=limit) break; await drop(m.key); usage-=m.size; }
+    return usage+need<=limit;
+  }
+  async function drop(k){ try{ await del('files',k); await del('fmeta',k); }catch(e){} keys.delete(k);
+    lib.tracks.forEach(t=>{ if(t.ck===k){ t.cached=false; if(t.file&&t.file.cached) t.file=null; } }); }
+  async function save(t){
+    if(!t||!t.ck||!t.file||t.file.cached) return 'skip';
+    const old=keys.get(t.ck); if(old&&old.size===t.file.size){ touch(t.ck); t.cached=true; return 'have'; }
+    if(!persisted&&navigator.storage&&navigator.storage.persist){ persisted=true; navigator.storage.persist().catch(()=>{}); }
+    if(!await room(t.file.size)) return 'full';
+    const m={key:t.ck,name:t.file.name,size:t.file.size,used:Date.now()};
+    try{ const blob=new Blob([await t.file.arrayBuffer()]); await put('files',t.ck,blob); await put('fmeta',t.ck,m); }
+    catch(e){ if(e&&e.name==='QuotaExceededError'){ try{ await del('files',t.ck); }catch(err){} return 'full'; } return 'fail'; }
+    keys.set(t.ck,m); t.cached=true; return 'ok';
+  }
+  function saveSoon(t){ if(autosave&&t&&t.src!=='demo') setTimeout(()=>save(t).then(r=>{ if(r==='ok'){ info(); if(!$('lib').hidden) renderRows(); } }),2500); }
+  /* library snapshot: no file handles, only what is needed to show the list and play from stored songs */
+  async function saveLib(){
+    if(lib.kind!=='rb'&&lib.restoredKind==='rb') return;   // never replace a rekordbox library with a few loose files
+    const uidx=new Map(); lib.tracks.forEach((t,k)=>uidx.set(t,k));
+    const snap={v:1,at:Date.now(),kind:lib.kind,label:lib.label,
+      tracks:lib.tracks.map(t=>({uid:t.uid,src:t.src,title:t.title,artist:t.artist,bpm:t.bpm,key:t.key,dur:t.dur,ck:t.ck,plc:t.plc,nHot:t.nHot,ana:t.ana||null})),
+      playlists:(lib.playlists||[]).map(p=>p.type==='item'?{type:'item',id:p.id,name:p.name,depth:p.depth,list:p.list.map(t=>uidx.get(t)).filter(x=>x!=null)}:{type:p.type,name:p.name,depth:p.depth})};
+    try{ await put('kv','lib',snap); }catch(e){}
+  }
+  async function restore(){
+    let snap=null; try{ snap=await get('kv','lib'); }catch(e){}
+    await ready; info();
+    if(!snap||!snap.tracks||lib.tracks.length) return;
+    const tracks=snap.tracks.map(t=>Object.assign({},t,{file:null,anlz:null,ext:null}));
+    const n=attach(tracks);
+    lib.kind=snap.kind; lib.restoredKind=snap.kind; lib.tracks=tracks; lib.missing=tracks.filter(t=>!t.file).length; lib.diag=null;
+    lib.playlists=(snap.playlists||[]).map(p=>p.type==='item'?Object.assign({},p,{list:p.list.map(k=>tracks[k]).filter(Boolean)}):p);
+    lib.label=(snap.label||'저장된 목록')+' · TV에 저장된 곡 '+n;
+    buildViews(); curView='all';
+    $('chip').classList.toggle('rb',snap.kind==='rb'); $('chipT').textContent=lib.label;
+    renderLib();
+  }
+  async function info(){
+    const el=$('stInfo'); if(!el) return; let size=0; keys.forEach(m=>size+=m.size);
+    let tail=''; try{ if(navigator.storage&&navigator.storage.estimate){ const e=await navigator.storage.estimate(); tail=' · 이 TV에서 쓸 수 있는 공간 약 '+(e.quota*.85/1073741824).toFixed(1)+'GB (사용 '+(e.usage/1073741824).toFixed(1)+'GB)'; } }catch(e){}
+    const gb=b=>b>=1073741824?(b/1073741824).toFixed(1)+'GB':Math.round(b/1048576)+'MB';
+    el.textContent='저장된 곡 '+keys.size+'곡 ('+gb(size)+')'+tail+(navigator.storage&&navigator.storage.estimate?'':' · 이 브라우저는 공간 정보를 알려주지 않아요');
+  }
+  /* save every playable song of the current list (button in the library); press again to stop */
+  async function saveList(list){
+    if(bulk){ bulk.stop=true; return; }
+    const todo=list.filter(t=>t.src!=='demo'&&t.file&&!t.file.cached&&!(keys.get(t.ck)&&keys.get(t.ck).size===t.file.size));
+    if(!todo.length){ setLibStatus('이 목록의 곡은 이미 모두 TV에 저장돼 있어요 (음원이 있는 곡 기준).'); return; }
+    bulk={stop:false}; $('saveView').textContent='저장 멈춤'; let ok=0, full=false;
+    for(let k=0;k<todo.length&&!bulk.stop;k++){
+      setLibStatus('TV에 저장 중 '+(k+1)+' / '+todo.length+' · '+todo[k].title);
+      const r=await save(todo[k]); if(r==='ok') ok++; if(r==='full'){ full=true; break; }
+    }
+    const stopped=bulk.stop; bulk=null; $('saveView').textContent='TV에 저장'; info(); renderRows();
+    setLibStatus((full?'TV 저장공간이 꽉 찼어요. ':stopped?'멈췄어요. ':'다 저장했어요. ')+ok+'곡을 새로 저장했어요. 앱을 나갔다 와도 바로 재생돼요.');
+  }
+  async function clear(){ if(bulk) bulk.stop=true;
+    for(const k of [...keys.keys()]) await drop(k);
+    try{ await del('kv','lib'); }catch(e){} info(); renderLib(); }
+  function setAuto(on){ autosave=on; try{ localStorage.setItem('tdj.autosave',on?'1':'0'); }catch(e){} $('autoSave').textContent=on?'켜짐':'꺼짐'; $('autoSave').classList.toggle('on',on); }
+  return {ready,attach,save,saveSoon,saveLib,restore,info,saveList,clear,setAuto,get auto(){ return autosave; }};
+})();
+const ckOf=p=>String(p||'').replace(/\\/g,'/').replace(/^\/+/,'').normalize('NFC').toLowerCase();
 
 const mtof=m=>440*Math.pow(2,(m-69)/12);
 async function renderDemo(spec){
@@ -1061,7 +1162,7 @@ async function ingest(fileList){
       const byId=new Map();
       r.tracks.forEach(t=>{ const file=find(t.path), anlz=find(t.anlzPath), ext=t.anlzPath?find(t.anlzPath.replace(/\.dat$/i,'.EXT')):null;
         if(file) used.add(file);
-        const tr={uid:'rb'+t.id,src:'rb',title:t.title||t.fname||'(제목 없음)',artist:t.artist,bpm:t.bpm||null,key:t.key,dur:t.dur,file,anlz,ext};
+        const tr={uid:'rb'+t.id,src:'rb',title:t.title||t.fname||'(제목 없음)',artist:t.artist,bpm:t.bpm||null,key:t.key,dur:t.dur,file,anlz,ext,ck:ckOf(t.path)};
         tracks.push(tr); byId.set(t.id,tr); });
       const kids=new Map(); r.lists.forEach(l=>{ if(!kids.has(l.parent)) kids.set(l.parent,[]); kids.get(l.parent).push(l); });
       const ent=new Map(); r.entries.forEach(e=>{ if(!ent.has(e.pl)) ent.set(e.pl,[]); ent.get(e.pl).push(e); });
@@ -1078,27 +1179,37 @@ async function ingest(fileList){
         if(k%40===0) setLibStatus('rekordbox 분석 파일 읽는 중… '+k+' / '+dats.length);
         try{ const a=parseAnlz(await dats[k].arrayBuffer()); if(!a.path) continue; const file=find(a.path); if(file) used.add(file);
           const nm=a.path.split('/').pop().replace(/\.[^.]+$/,'');
-          tracks.push({uid:'dat'+k,src:'rb',title:nm,artist:'',bpm:a.beats?a.beats.bpm:null,key:'',dur:0,file,anlz:dats[k],ext:sibling(dats[k],'.ext')}); }catch(e){}
+          tracks.push({uid:'dat'+k,src:'rb',title:nm,artist:'',bpm:a.beats?a.beats.bpm:null,key:'',dur:0,file,anlz:dats[k],ext:sibling(dats[k],'.ext'),ck:ckOf(a.path)}); }catch(e){}
       }
       tracks.sort((a,b)=>a.title.localeCompare(b.title,'ko'));
     }
   }
   const loose=files.filter(f=>AUDIO_EXT.test(f.name)&&!used.has(f)).sort((a,b)=>a.name.localeCompare(b.name,'ko'))
-    .map((f,k)=>({uid:'f'+k+'_'+f.size,src:'file',title:f.name.replace(/\.[^.]+$/,''),artist:(f.webkitRelativePath||'').split('/').slice(-2,-1)[0]||'',bpm:null,key:'',dur:0,file:f}));
+    .map((f,k)=>({uid:'f'+k+'_'+f.size,src:'file',title:f.name.replace(/\.[^.]+$/,''),artist:(f.webkitRelativePath||'').split('/').slice(-2,-1)[0]||'',bpm:null,key:'',dur:0,file:f,ck:ckOf(f.webkitRelativePath||f.name)}));
   tracks=tracks.concat(loose);
+  await STORE.ready; const stored=STORE.attach(tracks);   // songs saved on this TV play even when their bundle was not picked
   lib.kind=kind; lib.tracks=tracks; lib.playlists=playlists;
   const missing=tracks.filter(t=>!t.file).length;
   lib.label=kind==='rb'?'rekordbox USB · '+tracks.length.toLocaleString()+'곡'+(playlists.filter(p=>p.type==='item').length?' · 플레이리스트 '+playlists.filter(p=>p.type==='item').length+'개':''):'음악 파일 '+tracks.length.toLocaleString()+'곡';
+  if(stored) lib.label+=' · TV에 저장된 곡 '+stored;
   lib.missing=missing;
   const rbT=tracks.filter(t=>t.src==='rb');
   lib.diag={kind,pdbFile:!!pdbF,pdb:pdbOK,plus:!!files.find(f=>f.name.toLowerCase()==='exportlibrary.db'),tracks:tracks.length,rbTracks:rbT.length,
     playlists:playlists.filter(p=>p.type==='item').length,plEntries:playlists.reduce((n,p)=>n+(p.list?p.list.length:0),0),linked:tracks.filter(t=>t.file).length,missing,anlz:rbT.filter(t=>t.anlz).length,scanned:0,withHot:0,withGrid:0,scanning:true};
   scanAnalysis(rbT,lib.diag);
-  buildViews(); curView=tracks.length?'all':'demo';
+  buildViews(); curView=tracks.length?'all':'demo'; STORE.saveLib();
   $('chip').classList.toggle('rb',kind==='rb'); $('chipT').textContent=tracks.length?lib.label:'데모 트랙 2곡';
   libBusy=false; renderLib();
 }
 
+/* cue points, memory cues and beatgrid from the track's ANLZ files (.DAT, then .EXT for colours and names) */
+async function readAna(tr){
+  const a={beats:null,hot:[],mem:[]};
+  for(const f of [tr.anlz,tr.ext]){ if(!f) continue; try{ const r=parseAnlz(await f.arrayBuffer()); if(r.beats) a.beats=r.beats;
+    r.hot.forEach(h=>{ const ex=a.hot.findIndex(x=>x.slot===h.slot); if(ex>=0){ if(h.ext) a.hot[ex]=h; } else a.hot.push(h); });
+    if(r.mem.length&&!a.mem.length) a.mem=r.mem; }catch(e){} }
+  return a;
+}
 /* ================= deck loading ================= */
 async function loadToDeck(i,tr){
   const d=decks[i]; if(!tr) return; if(tr.src!=='demo'&&!tr.file) return;
@@ -1112,10 +1223,7 @@ async function loadToDeck(i,tr){
       [0,8,16,24].forEach((b,k)=>hot[k]={t:grid.t[b],loop:null,color:HOTC[k]});
     }else{
       buf=await decodeFile(tr.file); if(tok!==d.token) return;
-      const a={beats:null,hot:[],mem:[]};
-      for(const f of [tr.anlz,tr.ext]){ if(!f) continue; try{ const r=parseAnlz(await f.arrayBuffer()); if(r.beats) a.beats=r.beats;
-        r.hot.forEach(h=>{ const ex=a.hot.findIndex(x=>x.slot===h.slot); if(ex>=0){ if(h.ext) a.hot[ex]=h; } else a.hot.push(h); });
-        if(r.mem.length&&!a.mem.length) a.mem=r.mem; }catch(e){} }
+      const a=tr.ana||await readAna(tr); if(tr.anlz||tr.ext) tr.ana=a;
       if(a.beats){ grid={t:a.beats.t,n:a.beats.n}; bpm=a.beats.bpm||bpm; }
       else { const est=estimateGrid(buf); if(est){ grid=est.grid; bpm=est.bpm; approx=true; } }
       a.hot.forEach(h=>{ if(h.slot>=0&&h.slot<8) hot[h.slot]={t:h.t,loop:h.loop,color:h.color||HOTC[h.slot]}; });
@@ -1124,7 +1232,7 @@ async function loadToDeck(i,tr){
     if(tok!==d.token) return;
     Object.assign(d,{pin:null,last:null,buffer:buf,dur:buf.duration,wave:bandWave(buf),ovc:null,grid,bpm,approx,wrap,hot,cue,offset:cue,title:tr.title,artist:tr.artist||'',key:tr.key||'',track:tr,loopOn:false,del:false});
     $('name'+i).textContent=d.title; $('art'+i).textContent=d.artist; $('hubk'+i).textContent=(d.key?d.key+' · ':'')+(d.bpm?Math.round(d.bpm)+' BPM':''); $('lt'+i).textContent=d.title;
-    uiPitch(d); uiHot(d); uiLoop(d); uiTransport(d); markLoaded(); if(HPref) HPref.load(i);
+    uiPitch(d); uiHot(d); uiLoop(d); uiTransport(d); markLoaded(); if(HPref) HPref.load(i); STORE.saveSoon(tr);
   }catch(e){
     if(tok!==d.token) return;
     $('name'+i).textContent='이 곡은 재생할 수 없어요'; $('art'+i).textContent='mp3, m4a, wav 파일을 권장해요';
@@ -1421,11 +1529,11 @@ async function scanAnalysis(list,D){
   for(let k=0;k<items.length;k++){
     if(lib.diag!==D) return;
     const t=items[k];
-    try{ const a=parseAnlz(await t.anlz.arrayBuffer()); t.nHot=a.hot.length; if(a.hot.length) D.withHot++; if(a.beats){ D.withGrid++; if(!t.bpm) t.bpm=a.beats.bpm; } }catch(e){}
+    try{ const a=await readAna(t); t.ana=a; t.nHot=a.hot.length; if(a.hot.length) D.withHot++; if(a.beats){ D.withGrid++; if(!t.bpm) t.bpm=a.beats.bpm; } }catch(e){}
     D.scanned=k+1;
     if(k%40===39){ renderDiag(); await new Promise(r=>setTimeout(r,0)); }
   }
-  D.scanning=false; renderDiag();
+  D.scanning=false; renderDiag(); STORE.saveLib();
 }
 function renderDiag(){
   const el=$('diag'), D=lib.diag; if(!D){ el.hidden=true; return; } el.hidden=false;
@@ -1497,7 +1605,7 @@ function renderRows(){
   }
   $('rows').innerHTML=shown.map((t,k)=>{ const ok=t.src==='demo'||!!t.file, c=camOf(t);
     const keyTxt=esc(t.key||'')+(c&&!/\d/.test(t.key||'')?' · '+camStr(c):'');
-    return `<div class="row${ok?'':' miss'}${t.played?' played':''}" data-k="${k}"><div class="rt"><b>${esc(t.title)}${t._m?'<i class="mt">추천</i>':''}${t.played?'<i class="ck">✓ 틀었음</i>':''}</b><span>${esc(t.artist||(ok?'':'음원 없음'))}</span></div>
+    return `<div class="row${ok?'':' miss'}${t.played?' played':''}" data-k="${k}"><div class="rt"><b>${esc(t.title)}${t._m?'<i class="mt">추천</i>':''}${t.played?'<i class="ck">✓ 틀었음</i>':''}${t.cached?'<i class="tvs">TV</i>':''}</b><span>${esc(t.artist||'')}${ok?'':(t.artist?' · ':'')+'USB 묶음을 고르면 재생돼요'}</span></div>
       <span class="rn${t._b?' ok':''}">${t.bpm?t.bpm.toFixed(1)+' BPM':'—'}</span><span class="rn${t._k?' ok':''}">${keyTxt}</span><span class="rn">${t.dur?fmt(t.dur):''}</span>
       <button class="ld a" data-d="0" ${ok?'':'disabled'}>A로</button><button class="ld b" data-d="1" ${ok?'':'disabled'}>B로</button></div>`; }).join('')
     +(lib.tracks.length?'':`<div class="empty"><b>PC·노트북 크롬</b>: <b>USB 불러오기</b>를 누르고 USB 맨 위 폴더를 고르면 돼요.<br><br>
@@ -1793,6 +1901,11 @@ const HP=(()=>{
   return {tick,load:i=>{ if(open()) load(i); },mix:sendMix};
 })();
 HPref=HP;
+$('saveView').addEventListener('click',()=>{ const v=lib.views.find(x=>x.id===curView); STORE.saveList(v?v.list.filter(t=>t.src!=='demo'):[]); });
+$('autoSave').addEventListener('click',()=>STORE.setAuto(!STORE.auto));
+$('stClear').addEventListener('click',()=>STORE.clear());
+$('setBtn').addEventListener('click',()=>STORE.info());
+STORE.setAuto(STORE.auto); STORE.restore();
 /* ================= boot ================= */
 decks.forEach(d=>{ uiPitch(d); uiTransport(d); uiHot(d); });
 buildViews();
@@ -1800,7 +1913,7 @@ demoTracks.forEach((t,i)=>{ $('name'+i).textContent='데모 트랙 만드는 중
 Promise.all(demoSpecs.map(renderDemo)).then(bufs=>{ bufs.forEach((b,k)=>demoBufs[k]=b); demoTracks.forEach((t,i)=>loadToDeck(i,t)); })
   .catch(()=>decks.forEach(d=>{ $('name'+d.i).textContent='탐색에서 곡을 불러오세요'; }));
 requestAnimationFrame(frame);
-window.__dj={parsePdb,parseAnlz,ingest,lib:()=>lib};
+window.__dj={parsePdb,parseAnlz,ingest,lib:()=>lib,decks};
 })();
 </script>
 
