@@ -105,6 +105,9 @@ def run(root, auto=False):
     what = []
     if r['added']: what.append('새 곡 %d개' % r['added'])
     if r['changed']: what.append('바뀐 곡 %d개' % r['changed'])
+    if r.get('rekordbox') == 'same' and not r['added'] and not r['changed']:
+        notify('바뀐 게 없어서 그대로 뒀어요. USB를 빼도 돼요.', name)
+        log('nothing changed %s' % root); print('바뀐 게 없어서 그대로 뒀어요.'); return 0
     what.append('플레이리스트·큐 반영')
     notify(' · '.join(what) + '. 이제 USB를 빼도 돼요.', name)
     log('update done %s %s' % (root, r))

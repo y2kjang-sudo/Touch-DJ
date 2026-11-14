@@ -117,6 +117,30 @@ def pack(root, names, files, seed=None, log=print):
     return [f for f, _ in done]
 
 
+def same_as_bundle(root, files):
+    """True when dj1_rekordbox.tar already holds exactly these files. rekordbox re-saves export.pdb (new time,
+    same content) whenever it touches the USB, so files whose time changed are compared byte for byte."""
+    path = os.path.join(root, 'dj1_rekordbox.tar')
+    if not os.path.isfile(path): return False
+    try:
+        with tarfile.open(path, 'r:') as tf:
+            have = {key(m.name): m for m in tf if m.isfile()}
+            if set(have) != {key(f) for f in files}: return False
+            for f in files:
+                m, fp = have[key(f)], os.path.join(root, f)
+                if m.size != os.path.getsize(fp): return False
+                if int(m.mtime) == int(os.path.getmtime(fp)): continue
+                src = tf.extractfile(m)
+                with open(fp, 'rb') as g:
+                    while True:
+                        a, b = src.read(CHUNK), g.read(CHUNK)
+                        if a != b: return False
+                        if not a: break
+        return True
+    except (tarfile.TarError, OSError):
+        return False
+
+
 def update(root, rebuild=False, log=print):
     """Bring the bundles on a rekordbox USB up to date. Returns a summary dict."""
     root = os.path.abspath(root)
@@ -127,10 +151,16 @@ def update(root, rebuild=False, log=print):
             try: os.remove(os.path.join(root, f))
             except OSError: pass
 
-    pack(root, iter(['dj1_rekordbox.tar']), walk(root, 'PIONEER', ('PIONEER/Artwork',)), log=log)
+    pion = walk(root, 'PIONEER', ('PIONEER/Artwork',))
+    same = not rebuild and same_as_bundle(root, pion)
+    if same:
+        log('playlists and cues unchanged, dj1_rekordbox.tar kept')
+        os.utime(os.path.join(root, 'dj1_rekordbox.tar'), None)    # mark as up to date without rewriting
+    else:
+        pack(root, iter(['dj1_rekordbox.tar']), pion, log=log)
     old = music_bundles(root)
     songs = walk(root, 'Contents')
-    res = {'songs': len(songs), 'added': 0, 'changed': 0, 'bundles': []}
+    res = {'songs': len(songs), 'added': 0, 'changed': 0, 'bundles': [], 'rekordbox': 'same' if same else 'updated'}
 
     if rebuild or not old:
         made = pack(root, ('dj%d_music.tar' % n for n in range(2, 100)), songs, log=log)
