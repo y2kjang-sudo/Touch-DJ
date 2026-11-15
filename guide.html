@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>터치 DJ 사용 안내</title>
+<meta name="description" content="터치스크린 TV에서 쓰는 브라우저 DJ 앱. LG 스탠바이미에서 렉박 USB로 바로 디제잉.">
+<meta property="og:title" content="터치 DJ — 사용 안내">
+<meta property="og:description" content="터치스크린 TV에서 쓰는 브라우저 DJ 앱. 설치 없이 열어서 바로 써요.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&family=Inter:wght@600;700;800&display=swap">
+<style>
+:root{--bg:#08090b;--panel:#121316;--panel2:#191a1e;--line:rgba(255,255,255,.08);--fg:#eceef2;--mu:#9a9fa9;--t3:#5b606a;
+  --a:#ff9c3d;--b:#33d6cb;--ok:#3ee08a;--warn:#ffb648;color-scheme:dark}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--fg);font:16px/1.7 'IBM Plex Sans KR','Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif;word-break:keep-all;overflow-wrap:anywhere}
+a{color:var(--b)}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+header{padding:56px 0 28px;border-bottom:1px solid var(--line)}
+.brand{font:800 14px Inter,system-ui,sans-serif;letter-spacing:.32em;color:var(--mu)}
+.brand i{font-style:normal;color:var(--a)}
+h1{font-size:clamp(30px,7vw,46px);line-height:1.2;font-weight:700;margin:14px 0 12px;letter-spacing:-.01em}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{color:var(--mu);font-size:17px;max-width:620px}
+.badge{display:inline-block;font:700 11px Inter,system-ui,sans-serif;letter-spacing:.14em;color:var(--warn);border:1px solid rgba(255,182,72,.5);border-radius:4px;padding:2px 7px;margin-left:8px;vertical-align:4px}
+.cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:50px;padding:0 22px;border-radius:12px;font-weight:700;text-decoration:none;border:1px solid var(--line);color:var(--fg);background:var(--panel2)}
+.btn.pri{background:var(--fg);color:#0b0c0e;border-color:var(--fg)}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px;padding:18px 0;border-bottom:1px solid var(--line)}
+nav.toc a{font-size:14px;color:var(--mu);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+section{padding:40px 0;border-bottom:1px solid var(--line)}
+h2{font-size:24px;font-weight:700;margin-bottom:6px}
+.sub{color:var(--mu);margin-bottom:20px}
+h3{font-size:17px;font-weight:700;margin:0 0 6px}
+p+p{margin-top:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.card{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+.card p{color:var(--mu);font-size:15px}
+.dev{display:flex;gap:12px;align-items:flex-start}
+.dot{width:10px;height:10px;border-radius:50%;margin-top:9px;flex:none}
+.y{background:var(--ok);box-shadow:0 0 8px var(--ok)} .m{background:var(--warn)} .n{background:var(--t3)}
+ol.steps{list-style:none;counter-reset:s;display:grid;gap:12px}
+ol.steps>li{min-width:0;counter-increment:s;position:relative;padding:16px 18px 16px 58px;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+ol.steps>li::before{content:counter(s);position:absolute;left:16px;top:14px;width:28px;height:28px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font:700 14px Inter,system-ui,sans-serif;color:var(--a)}
+ol.steps li p{color:var(--mu);font-size:15px;margin-top:4px}
+code{font:13.5px ui-monospace,Menlo,Consolas,monospace;background:#050607;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--fg)}
+pre{max-width:100%;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;background:#050607;border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto;margin-top:8px;white-space:pre}
+.path{display:grid;gap:12px;grid-template-columns:minmax(0,1fr)}
+.tag{display:inline-block;font:700 11px Inter,system-ui,sans-serif;letter-spacing:.1em;padding:2px 8px;border-radius:4px;margin-bottom:8px}
+.ta{background:rgba(255,156,61,.14);color:var(--a)} .tb{background:rgba(51,214,203,.14);color:var(--b)} .tc{background:rgba(62,224,138,.14);color:var(--ok)}
+details{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:0 18px}
+details+details{margin-top:10px}
+summary{cursor:pointer;font-weight:600;padding:16px 0;list-style:none;display:flex;justify-content:space-between;gap:12px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:'+';color:var(--mu);font-weight:400}
+details[open] summary::after{content:'−'}
+details p{color:var(--mu);font-size:15px;padding-bottom:16px}
+.note{background:rgba(255,182,72,.08);border:1px solid rgba(255,182,72,.3);border-radius:14px;padding:16px 18px;color:#e9d3b0;font-size:15px}
+footer{padding:36px 0 56px;color:var(--t3);font-size:13px}
+footer p+p{margin-top:8px}
+@media (max-width:520px){ header{padding-top:40px} section{padding:32px 0} ol.steps>li{padding-left:52px} }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="brand">TOUCH<i>·</i>DJ</div>
+  <h1>터치스크린 TV를<br><em>DJ 컨트롤러</em>로.<span class="badge">BETA</span></h1>
+  <p class="lead">브라우저에서 바로 여는 DJ 앱이에요. LG 스탠바이미 같은 터치 TV에서 렉박(rekordbox) USB의 플레이리스트·핫큐·비트그리드를 그대로 불러와 손가락으로 디제잉해요. 설치도 가입도 없어요.</p>
+  <div class="cta"><a class="btn pri" href="./">앱 열기</a><a class="btn" href="#start">처음 시작하기</a></div>
+</div></header>
+
+<div class="wrap">
+<nav class="toc" aria-label="목차"><a href="#devices">쓸 수 있는 기기</a><a href="#start">바로 해보기</a><a href="#music">내 음악 쓰기</a><a href="#features">기능</a><a href="#phone">폰 헤드폰</a><a href="#faq">자주 묻는 질문</a></nav>
+
+<section id="devices">
+  <h2>쓸 수 있는 기기</h2>
+  <p class="sub">인터넷 브라우저만 있으면 열려요. 가로로 넓은 화면을 기준으로 만들었어요.</p>
+  <div class="grid">
+    <div class="card dev"><i class="dot y"></i><div><h3>LG 스탠바이미 · 스탠바이미 2</h3><p>이 기기에서 만들고 가장 많이 테스트했어요. TV 브라우저로 열면 돼요.</p></div></div>
+    <div class="card dev"><i class="dot y"></i><div><h3>PC · Mac 크롬</h3><p>마우스로도 돼요. 렉박 USB 폴더를 통째로 고를 수 있어서 준비가 가장 쉬워요.</p></div></div>
+    <div class="card dev"><i class="dot m"></i><div><h3>태블릿 · 다른 터치 TV</h3><p>열리긴 하지만 많이 테스트하지 못했어요. 써 보고 알려 주시면 고칠게요.</p></div></div>
+    <div class="card dev"><i class="dot n"></i><div><h3>스마트폰</h3><p>화면이 너무 작아서 추천하지 않아요. 대신 <a href="#phone">헤드폰 모니터</a>로 쓰면 좋아요.</p></div></div>
+  </div>
+</section>
+
+<section id="start">
+  <h2>바로 해보기</h2>
+  <p class="sub">준비물 없이 데모 곡 두 개로 1분 만에 손에 익혀 보세요.</p>
+  <ol class="steps">
+    <li><b>TV 브라우저에서 앱을 열어요</b><p>주소창에 <code>y2kjang-sudo.github.io/Touch-DJ</code> 를 입력해요. 화면을 한 번 터치하면 전체화면이 돼요.</p></li>
+    <li><b>왼쪽 덱의 ▶ 를 눌러요</b><p>가운데 위쪽 파형에서 빨간 세로선이 한 마디(4박)의 시작이에요.</p></li>
+    <li><b>오른쪽 덱의 SYNC 를 켜고 ▶</b><p>두 곡의 박자가 자동으로 맞아요. 가운데 아래 크로스페이더를 밀어서 넘겨 보세요.</p></li>
+    <li><b>MIX 를 눌러 보세요</b><p>상대 덱이 재생 중일 때 MIX를 누르면, 다음 마디 첫 박에 맞춰 알아서 시작하고 싱크까지 걸려요. 타이밍을 맞춰 누를 필요가 없어요.</p></li>
+  </ol>
+</section>
+
+<section id="music">
+  <h2>내 음악 쓰기</h2>
+  <p class="sub">쓰는 방식에 맞는 것 하나만 하면 돼요.</p>
+  <div class="path">
+    <div class="card"><span class="tag ta">가장 간단</span><h3>음악 파일 몇 곡만</h3>
+      <p>앱 위쪽 <b>탐색</b> → <b>파일 고르기</b>로 mp3 · m4a · wav 파일을 골라요. BPM과 비트그리드는 앱이 직접 분석해요.</p></div>
+    <div class="card"><span class="tag tb">PC · Mac</span><h3>렉박 USB를 크롬에서</h3>
+      <p>렉박에서 USB로 내보낸 뒤, 크롬으로 앱을 열고 <b>USB 불러오기</b> → USB 맨 위 폴더를 골라요. 플레이리스트·핫큐·메모리 큐·비트그리드가 그대로 들어와요.</p></div>
+    <div class="card"><span class="tag tc">스탠바이미</span><h3>렉박 USB를 TV에서</h3>
+      <p>TV 브라우저는 폴더를 통째로 고를 수 없고, 대부분의 USB(FAT32)는 4GB가 넘는 파일을 못 담아요. 그래서 Mac에서 USB 내용을 <b>dj로 시작하는 묶음 파일</b> 몇 개로 정리해 둬요. 한 번만 설정하면 그다음부터는 자동이에요.</p>
+      <ol class="steps" style="margin-top:14px">
+        <li><b>Mac에 자동 정리 도구 설치 (한 번만)</b><p>렉박 USB를 Mac에 꽂고, 터미널(응용 프로그램 → 유틸리티)에 아래 한 줄을 붙여 넣어요. 이 USB에 묶음을 만들지 물어보면 <code>y</code>를 눌러요.</p>
+          <pre>curl -fsSL https://raw.githubusercontent.com/y2kjang-sudo/Touch-DJ/main/tools/install-mac.sh | zsh</pre>
+          <p>macOS가 USB 접근을 물어보면 '허용'을 눌러 주세요. USB에는 <code>dj1_rekordbox.tar</code>, <code>dj2_music.tar</code>… 가 생겨요.</p></li>
+        <li><b>그다음부턴 렉박에서 내보내기만</b><p>곡이나 플레이리스트를 바꿔 내보내면 1분쯤 뒤 Mac이 알아서 묶음을 업데이트하고 알림을 띄워요. 알림이 뜬 뒤에 USB를 빼세요.</p></li>
+        <li><b>스탠바이미에서 불러오기</b><p>USB를 TV에 꽂고 앱에서 <b>탐색</b> → <b>파일 고르기</b> → USB 맨 위의 <code>dj</code>로 시작하는 파일을 모두 골라요.</p></li>
+        <li><b>다음부터는 바로</b><p>불러온 목록과 덱에 올린 곡은 TV에 저장돼서, 앱을 나갔다 와도 바로 이어서 쓸 수 있어요. 라이브러리의 <b>TV에 저장</b>을 누르면 플레이리스트 통째로 미리 저장해 둘 수도 있어요.</p></li>
+      </ol>
+      <p style="margin-top:12px">Windows용 자동 도구는 아직 없어요. 파이썬이 있다면 <code>tools/make_bundles.py</code>를 직접 실행할 수 있지만 테스트하지 못했어요.</p></div>
+  </div>
+</section>
+
+<section id="features">
+  <h2>기능</h2>
+  <p class="sub">설정 버튼에서 대부분 켜고 끌 수 있어요.</p>
+  <div class="grid">
+    <div class="card"><h3>렉박 그대로</h3><p>플레이리스트, 폴더, 핫큐(색 포함), 메모리 큐, 비트그리드를 읽어요. 렉박에는 아무것도 쓰지 않아요.</p></div>
+    <div class="card"><h3>싱크 · 퀀타이즈</h3><p>박자를 계속 맞춰 주는 싱크와, 늦게 눌러도 박에 맞춰 주는 퀀타이즈. 핫큐·루프·FX 모두 박에 붙어요.</p></div>
+    <div class="card"><h3>MIX 예약</h3><p>다음 곡을 1·4·8·16마디 단위에 맞춰 자동으로 시작해요. 렉박에서 핫큐 이름을 <code>MIX</code>로 붙이거나, MIX 버튼을 길게 눌러 TV에 믹스 지점을 저장해요.</p></div>
+    <div class="card"><h3>폰 헤드폰</h3><p>스피커는 스테레오 그대로, 다음 곡은 같은 와이파이의 폰으로 미리 들어요.</p></div>
+    <div class="card"><h3>루프 · 패드 · FX</h3><p>1~32박 루프, 루프 IN/OUT, 점프·롤 패드, 환호·에어혼·라이저 같은 FX를 덱별로 보내요.</p></div>
+    <div class="card"><h3>스킨 · 믹서</h3><p>실제 장비 같은 컨트롤러 스킨과 LP 레코드 스킨, 돌리는 노브와 세로 슬라이더 믹서 중에서 골라요.</p></div>
+  </div>
+</section>
+
+<section id="phone">
+  <h2>폰 헤드폰</h2>
+  <p class="sub">TV 스피커로 관객 소리를 내면서, 다음 곡은 폰 이어폰으로 미리 들어요.</p>
+  <ol class="steps">
+    <li><b>TV 앱 설정 → 폰 헤드폰 → 켜기</b><p>QR 코드와 6자리 코드가 떠요. TV와 폰이 같은 와이파이(또는 폰 핫스팟)에 있어야 해요.</p></li>
+    <li><b>폰으로 QR을 찍고 '연결'</b><p>덱에 올린 곡이 폰으로 넘어가요. 곡 파일은 집 와이파이 안에서 TV와 폰이 직접 주고받아요.</p></li>
+    <li><b>CUE로 미리 들을 덱을 골라요</b><p>TV 덱의 헤드폰 버튼이나 폰의 CUE 버튼으로 골라요. 폰의 '헤드폰 믹스'로 메인 소리를 섞어 들을 수 있어요. TV와 소리가 어긋나면 폰에서 ±로 맞춰요.</p></li>
+  </ol>
+</section>
+
+<section id="faq">
+  <h2>자주 묻는 질문</h2>
+  <details><summary>앱을 설치해야 하나요?</summary><p>아니요. 브라우저로 주소를 열면 끝이에요. 업데이트도 자동이에요. 예전 화면이 보이면 새로고침해 주세요.</p></details>
+  <details><summary>무료인가요?</summary><p>네, 개인적으로 쓰는 건 무료예요. 소스 코드는 깃허브에 공개돼 있어요. 다만 이 앱을 팔거나 유료 서비스·영업에 쓰는 건 비상업적 라이선스라 허락이 필요해요(아래 '라이선스' 참고).</p></details>
+  <details><summary>렉박 라이브러리나 USB가 바뀌나요?</summary><p>아니요. 앱은 USB를 읽기만 해요. TV에서 찍은 큐나 MIX 지점은 TV에만 저장되고 렉박에는 돌아가지 않아요.</p></details>
+  <details><summary>제 음악이 어딘가로 올라가나요?</summary><p>아니요. 곡은 기기 안에서만 재생돼요. 폰 헤드폰을 켜면 같은 네트워크 안의 폰으로만 직접 보내요. 처음 연결할 때 서로를 찾는 짧은 신호만 공개 중계 서비스(ntfy.sh)를 거쳐요.</p></details>
+  <details><summary>블루투스 스피커로 들으면 화면이 소리보다 빨라요</summary><p>블루투스는 소리가 늦게 나와요. 설정 → 블루투스 화면 지연에서 킥 소리와 빨간 마디선이 맞을 때까지 조절하세요.</p></details>
+  <details><summary>스탠바이미에서 앱을 나갔다 오면 다시 불러와야 하나요?</summary><p>목록과 덱에 올렸던 곡은 TV에 저장돼서 바로 써요(TV 표시가 붙은 곡). 저장 안 된 곡만 USB 묶음을 다시 고르면 돼요.</p></details>
+  <details><summary>박자가 흔들리는 곡은 싱크가 어긋나요</summary><p>렉박에서 그 곡을 BPM이 변하는 곡용 '다이내믹' 분석으로 다시 분석해 내보내면, 앱이 박 하나하나를 따라가요.</p></details>
+  <details><summary>문제가 생기거나 기능을 제안하고 싶어요</summary><p><a href="https://github.com/y2kjang-sudo/Touch-DJ/issues">깃허브 이슈</a>에 남겨 주세요. 어떤 기기·브라우저였는지 같이 적어 주시면 고치기 쉬워요.</p></details>
+</section>
+
+<section id="license">
+  <h2>라이선스 · 안내</h2>
+  <div class="note">개인 취미로 만든 베타 프로젝트예요. 기기마다 동작이 다를 수 있고, 예고 없이 바뀔 수 있어요. 공연에 쓰기 전에는 꼭 미리 연습해 보세요.</div>
+  <p style="margin-top:14px;color:var(--mu);font-size:15px">소스 코드는 <a href="https://github.com/y2kjang-sudo/Touch-DJ/blob/main/LICENSE">PolyForm Noncommercial 1.0.0</a> 라이선스를 따라요. 개인 취미·공부·연구 같은 비상업적 용도로는 자유롭게 쓰고 고칠 수 있어요. 판매, 유료 서비스, 영업 목적의 사용은 먼저 문의해 주세요.</p>
+</section>
+</div>
+
+<footer><div class="wrap">
+  <p>rekordbox는 AlphaTheta Corporation의 상표, LG와 StanbyME는 LG전자의 상표예요. 터치 DJ는 이 회사들과 관련이 없는 개인 프로젝트예요.</p>
+  <p><a href="./">앱 열기</a> · <a href="https://github.com/y2kjang-sudo/Touch-DJ">깃허브</a></p>
+</div></footer>
+</body>
+</html>

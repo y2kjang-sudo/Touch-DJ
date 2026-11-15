@@ -1,5 +1,7 @@
 # 터치 DJ 스테이션
 
+**처음이세요? → [사용 안내](https://y2kjang-sudo.github.io/Touch-DJ/guide.html)** · [앱 열기](https://y2kjang-sudo.github.io/Touch-DJ/)
+
 LG 스탠바이미 2 같은 가로형 터치 화면에서 브라우저로 돌아가는 2덱 DJ 컨트롤러예요. 설치 없이 `index.html` 하나로 동작해요.
 
 ## 기능
@@ -57,3 +59,9 @@ curl -fsSL https://raw.githubusercontent.com/y2kjang-sudo/Touch-DJ/main/tools/in
 - 웹페이지라 블루투스 스피커의 소리 지연(0.2초 안팎)은 줄일 수 없어요. 설정의 화면 지연 보정으로 화면을 소리에 맞출 수 있어요.
 - 마스터와 큐를 다른 출력으로 나눠 들을 수 없어요.
 - webOS TV 앱은 USB에 접근할 수 없어서(LG 정책), 네이티브 앱 대신 브라우저로 동작해요.
+
+## 라이선스
+
+[PolyForm Noncommercial 1.0.0](LICENSE). 개인 취미·공부·연구 같은 비상업적 용도로는 자유롭게 쓰고 고칠 수 있어요. 판매, 유료 서비스, 영업 목적의 사용은 먼저 문의해 주세요.
+
+rekordbox는 AlphaTheta Corporation의 상표, LG와 StanbyME는 LG전자의 상표예요. 이 프로젝트는 이 회사들과 관련이 없는 개인 프로젝트예요.
