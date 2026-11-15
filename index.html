@@ -456,7 +456,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v23</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v24</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -477,7 +477,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
     <div class="srow"><div><b>가벼운 모드</b><span>파형 해상도를 낮춰 TV에서 더 부드럽게 움직여요. 스탠바이미에서는 처음부터 켜져 있어요.</span></div><button class="hb" id="perfBtn">켜짐</button></div>
     <div class="srow col"><div><b>기기 정보</b><span id="uaInfo"></span></div></div>
     <div class="srow col"><div><b>믹서 모드</b><span>클래식은 돌리는 노브와 박 단위 루프예요. 디지털은 세로 EQ 슬라이더와 킬 버튼, 가로 필터에, 덱마다 루프 IN·OUT과 길이 조절이 더해져요. 두 모드는 같은 값을 써서 바꿔도 소리는 그대로예요.</span></div><div class="seg two" id="mixSeg"><button data-m="classic">클래식</button><button data-m="touch">디지털</button></div></div>
-    <div class="srow col"><div><b>MIX 예약 단위</b><span>다음 곡 덱의 MIX를 누르면, 지금 곡의 다음 이 마디 단위 첫 박에 맞춰 다음 곡이 믹스 포인트부터 자동으로 시작되고 싱크가 걸려요. 믹스 포인트는 렉박에서 이름을 MIX로 붙인 핫큐(없으면 MIX 메모리 큐, 첫 메모리 큐, 핫큐 A 순)예요.</span></div><div class="seg" id="mbSeg" style="grid-template-columns:repeat(4,1fr)"><button data-v="1">1마디</button><button data-v="4">4마디</button><button data-v="8">8마디</button><button data-v="16">16마디</button></div></div>
+    <div class="srow col"><div><b>MIX 예약 단위</b><span>다음 곡 덱의 MIX를 누르면, 지금 곡의 다음 이 마디 단위 첫 박에 맞춰 다음 곡이 믹스 포인트부터 자동으로 시작되고 싱크가 걸려요. 믹스 포인트는 MIX를 길게 눌러 이 TV에 저장한 지점이 먼저이고, 없으면 렉박에서 이름을 MIX로 붙인 핫큐 → MIX 메모리 큐 → 첫 메모리 큐 → 핫큐 A 순이에요. MIX를 길게 누르면 그 덱의 지금 위치가 이 곡의 믹스 포인트로 TV에만 저장돼요(렉박은 바뀌지 않아요). 같은 자리에서 다시 길게 누르면 지워져요.</span></div><div class="seg" id="mbSeg" style="grid-template-columns:repeat(4,1fr)"><button data-v="1">1마디</button><button data-v="4">4마디</button><button data-v="8">8마디</button><button data-v="16">16마디</button></div></div>
     <div class="srow col"><div><b>블루투스 화면 지연 (ms)</b><span>킥 소리가 들리는 순간 빨간 마디선이 가운데 흰 선을 지나가도록 맞추세요.</span></div><div class="seg" id="latSeg"></div></div>
   </div>
 
@@ -1066,9 +1066,13 @@ const STORE=(()=>{
   }
   async function clear(){ if(bulk) bulk.stop=true;
     for(const k of [...keys.keys()]) await drop(k);
-    try{ await del('kv','lib'); }catch(e){} info(); renderLib(); }
+    try{ await del('kv','lib'); await del('kv','mixpts'); }catch(e){} mixpts={}; info(); renderLib(); }
+  let mixpts={}; const mixReady=(async()=>{ try{ mixpts=(await get('kv','mixpts'))||{}; }catch(e){ try{ mixpts=JSON.parse(localStorage.getItem('tdj.mixpts')||'{}'); }catch(err){} } })();
+  function mixOf(ck){ return ck&&mixpts[ck]!=null?mixpts[ck]:null; }
+  async function setMix(ck,t){ if(!ck) return; if(t==null) delete mixpts[ck]; else mixpts[ck]=Math.round(t*1000)/1000;
+    try{ await put('kv','mixpts',mixpts); }catch(e){ try{ localStorage.setItem('tdj.mixpts',JSON.stringify(mixpts)); }catch(err){} } }
   function setAuto(on){ autosave=on; try{ localStorage.setItem('tdj.autosave',on?'1':'0'); }catch(e){} $('autoSave').textContent=on?'켜짐':'꺼짐'; $('autoSave').classList.toggle('on',on); }
-  return {ready,attach,save,saveSoon,saveLib,restore,info,saveList,clear,setAuto,get auto(){ return autosave; }};
+  return {ready,attach,save,saveSoon,saveLib,restore,info,saveList,clear,setAuto,mixOf,setMix,mixReady,get auto(){ return autosave; }};
 })();
 const ckOf=p=>String(p||'').replace(/\\/g,'/').replace(/^\/+/,'').normalize('NFC').toLowerCase();
 
@@ -1253,7 +1257,8 @@ async function loadToDeck(i,tr){
 let MIXBARS=8; try{ MIXBARS=+(localStorage.getItem('tdj.mixbars')||8)||8; }catch(e){}
 const isMix=c=>!!c&&/\bmix\b/i.test(c.name||'');
 function mixPoint(d){
-  const a=d.track&&d.track.ana;
+  const a=d.track&&d.track.ana, tv=d.track&&STORE.mixOf(d.track.ck);
+  if(tv!=null) return {t:tv,src:'TV MIX'};
   const h=d.hot.find(isMix); if(h) return {t:h.t,src:'MIX 핫큐'};
   const m=a&&a.mem&&a.mem.find(isMix); if(m) return {t:m.t,src:'MIX 메모리 큐'};
   if(a&&a.mem&&a.mem.length) return {t:a.mem.reduce((x,y)=>y.t<x.t?y:x).t,src:'첫 메모리 큐'};
@@ -1291,6 +1296,16 @@ function mixTick(){
       d.mix=null; d.mixMsg='시작!'; setTimeout(()=>{ d.mixMsg=''; uiMixBtn(d); },1500);
     }
     uiMixBtn(d); });
+}
+/* long-press MIX: the deck's current position becomes this song's MIX point on this TV (long-press there again to remove) */
+function mixMark(d){
+  const say=m=>{ d.mixMsg=m; uiMixBtn(d); setTimeout(()=>{ if(d.mixMsg===m){ d.mixMsg=''; uiMixBtn(d); } },1600); };
+  if(!d.buffer||!d.track||!d.track.ck){ say('저장 못 하는 곡'); return; }
+  if(d.mix) mixCancel(d);
+  let p=pos(d); if(d.q&&d.grid) p=snap(d,p);
+  const old=STORE.mixOf(d.track.ck);
+  if(old!=null&&Math.abs(old-p)<.25){ STORE.setMix(d.track.ck,null); say('TV MIX 지움'); return; }
+  STORE.setMix(d.track.ck,p); say('MIX 저장 '+fmt(p));
 }
 function uiMixBtn(d){ const b=$('mix'+d.i); if(!b) return;
   const t=d.mixMsg||(d.mix?'MIX · '+(d.mix.left||'…')+'마디':'MIX');
@@ -1408,7 +1423,11 @@ decks.forEach((d,i)=>{
     changeRate(d,()=>d.pitch=Math.abs(v)<.002?0:v); uiPitch(d); }});
 
   tap($('play'+i),()=>{ if(d.mix) mixCancel(d); d.playing?pause(d):play(d); });
-  tap($('mix'+i),()=>mixArm(d));
+  { const b=$('mix'+i); let tm=null, long=false;   // tap = arm, hold 0.6 s = set this song's MIX point here
+    b.addEventListener('pointerdown',e=>{ if(e.button>0) return; e.preventDefault(); long=false; clearTimeout(tm); tm=setTimeout(()=>{ long=true; mixMark(d); },600); });
+    b.addEventListener('pointerup',()=>{ if(tm===null) return; clearTimeout(tm); tm=null; if(!long) mixArm(d); });
+    b.addEventListener('pointercancel',()=>{ clearTimeout(tm); tm=null; });
+    b.addEventListener('click',e=>{ if(e.detail===0) mixArm(d); }); }
   tap($('cue'+i),()=>{ if(!d.buffer) return; ensureCtx(); if(d.playing){ pause(d); seek(d,d.cue); } else { d.cue=snap(d,pos(d)); d.ver++; } flash($('cue'+i)); });
   /* Beat sync: this deck follows the other deck's tempo and stays phase-locked until switched off */
   tap($('sync'+i),()=>{
