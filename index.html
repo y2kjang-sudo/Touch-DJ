@@ -164,7 +164,9 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 .digital .hc{height:50px} .digital .lp{height:42px} .digital .tbtn{height:68px}
 .lp.ex{font-family:var(--f-disp);font-size:12px;letter-spacing:.1em;color:var(--muted)}
 
-.transport{display:grid;grid-template-columns:1fr 1.6fr 1fr;gap:8px}
+.transport{display:grid;grid-template-columns:1fr 1.4fr 1fr 1fr;gap:8px}
+.tbtn.mix{font-size:14px;letter-spacing:.06em;white-space:nowrap}
+.tbtn.mix.on{background:var(--ok);border-color:var(--ok);color:var(--bg)}
 .tbtn{height:76px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);font-family:var(--f-disp);font-weight:700;letter-spacing:.12em;font-size:16px;touch-action:none}
 .tbtn.cue{border-color:var(--c);color:var(--c)}
 .tbtn.play{font-size:26px}
@@ -422,7 +424,9 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 .ctl .lp.ex{font-size:11px;color:var(--t3)}
 .ctl .llen{height:42px;display:flex;align-items:center;justify-content:center;border-radius:7px;background:#050607;font-weight:700}
 /* transport: round CUE / PLAY with LED rings, wide SYNC */
-.ctl .transport{grid-template-columns:76px 76px 1fr;gap:20px;padding-left:8px;align-items:center}
+.ctl .transport{grid-template-columns:76px 76px 1fr 1fr;gap:16px;padding-left:8px;align-items:center}
+.ctl .tbtn.mix{height:56px;letter-spacing:.08em;font-size:12px}
+.ctl .digital .tbtn.mix{height:52px}
 .ctl .tbtn{background:#17181c;border:1px solid var(--line);border-radius:12px;font-weight:800;font-size:13px;letter-spacing:.3em;color:var(--muted)}
 .ctl .tbtn.cue,.ctl .tbtn.play{--rc:#4a3612;width:76px;height:76px;border:0;border-radius:50%;padding:0;letter-spacing:.12em;
   background:radial-gradient(circle at 50% 35%,#24262b,#141518 70%);box-shadow:0 0 0 1px rgba(255,255,255,.06),0 0 0 4px #0b0c0e,0 0 0 6px var(--rc),0 6px 14px rgba(0,0,0,.6)}
@@ -432,7 +436,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
   box-shadow:0 0 0 1px rgba(255,255,255,.06),0 0 0 4px #0b0c0e,0 0 0 6px var(--ok),0 0 18px rgba(62,224,138,.35)}
 .ctl .tbtn.sync{height:56px}
 .ctl .tbtn.sync.on{background:linear-gradient(rgba(23,24,28,.86),rgba(23,24,28,.86)),var(--c);border-color:var(--c);color:var(--c)}
-.ctl .digital .transport{grid-template-columns:68px 68px 1fr}
+.ctl .digital .transport{grid-template-columns:68px 68px 1fr 1fr}
 .ctl .digital .tbtn.cue,.ctl .digital .tbtn.play{width:68px;height:68px}
 .ctl .digital .tbtn.sync{height:52px}
 /* FX */
@@ -452,7 +456,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v22</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v23</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -473,6 +477,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
     <div class="srow"><div><b>가벼운 모드</b><span>파형 해상도를 낮춰 TV에서 더 부드럽게 움직여요. 스탠바이미에서는 처음부터 켜져 있어요.</span></div><button class="hb" id="perfBtn">켜짐</button></div>
     <div class="srow col"><div><b>기기 정보</b><span id="uaInfo"></span></div></div>
     <div class="srow col"><div><b>믹서 모드</b><span>클래식은 돌리는 노브와 박 단위 루프예요. 디지털은 세로 EQ 슬라이더와 킬 버튼, 가로 필터에, 덱마다 루프 IN·OUT과 길이 조절이 더해져요. 두 모드는 같은 값을 써서 바꿔도 소리는 그대로예요.</span></div><div class="seg two" id="mixSeg"><button data-m="classic">클래식</button><button data-m="touch">디지털</button></div></div>
+    <div class="srow col"><div><b>MIX 예약 단위</b><span>다음 곡 덱의 MIX를 누르면, 지금 곡의 다음 이 마디 단위 첫 박에 맞춰 다음 곡이 믹스 포인트부터 자동으로 시작되고 싱크가 걸려요. 믹스 포인트는 렉박에서 이름을 MIX로 붙인 핫큐(없으면 MIX 메모리 큐, 첫 메모리 큐, 핫큐 A 순)예요.</span></div><div class="seg" id="mbSeg" style="grid-template-columns:repeat(4,1fr)"><button data-v="1">1마디</button><button data-v="4">4마디</button><button data-v="8">8마디</button><button data-v="16">16마디</button></div></div>
     <div class="srow col"><div><b>블루투스 화면 지연 (ms)</b><span>킥 소리가 들리는 순간 빨간 마디선이 가운데 흰 선을 지나가도록 맞추세요.</span></div><div class="seg" id="latSeg"></div></div>
   </div>
 
@@ -589,6 +594,7 @@ const deckHTML=i=>`
       <button class="tbtn cue" id="cue${i}">CUE</button>
       <button class="tbtn play" id="play${i}" aria-label="재생">▶</button>
       <button class="tbtn sync" id="sync${i}" aria-label="비트싱크">SYNC</button>
+      <button class="tbtn mix" id="mix${i}" aria-label="믹스 예약">MIX</button>
     </div>
   </div>
 </section>`;
@@ -683,7 +689,7 @@ function applyMix(){
 const rate=d=>(1+d.pitch)*(1+d.bend);
 function pos(d){
   if(!d.buffer) return 0;
-  if(!d.playing||!ctx) return d.offset;
+  if(!d.playing||!ctx||ctx.currentTime<d.startedAt) return d.offset;   // scheduled start not reached yet
   let p=d.offset+(ctx.currentTime-d.startedAt)*rate(d);
   if(d.loopOn){ if(p>=d.lout) p=d.lin+((p-d.lin)%(d.lout-d.lin)); return p; }
   return d.wrap?p%d.dur:Math.min(p,d.dur);
@@ -697,11 +703,11 @@ function vpos(d){
 }
 function rebase(d){ if(d.playing){ d.offset=pos(d); d.startedAt=ctx.currentTime; } }
 function stopSrc(d){ if(d.src){ d.src.onended=null; try{d.src.stop();}catch(e){} d.src=null; } }
-function startSrc(d){
+function startSrc(d,at){
   const s=ctx.createBufferSource(); s.buffer=d.buffer; s.playbackRate.value=rate(d);
   s.loop=d.loopOn||d.wrap; if(d.loopOn){ s.loopStart=d.lin; s.loopEnd=d.lout; }
-  s.connect(d.nodes.lo); s.start(0,clamp(d.offset,0,d.dur-.01));
-  d.src=s; d.startedAt=ctx.currentTime; d.playing=true;
+  s.connect(d.nodes.lo); s.start(at||0,clamp(d.offset,0,d.dur-.01));
+  d.src=s; d.startedAt=at&&at>ctx.currentTime?at:ctx.currentTime; d.playing=true;
   if(!s.loop) s.onended=()=>{ if(d.src===s){ d.src=null; d.playing=false; d.offset=d.dur; uiTransport(d); } };
 }
 /* Quantize: an action is placed on the beat grid instead of the moment of the tap.
@@ -754,7 +760,7 @@ function syncPhase(d,o,hard){
 function syncStep(){
   decks.forEach(d=>{ if(!d.sync) return; const o=decks[1-d.i]; if(!d.bpm||!o.bpm||!ctx) return;
     syncTempo(d,o);
-    if(d.playing&&o.playing&&!d.hold) syncPhase(d,o,false);
+    if(d.playing&&o.playing&&!d.hold&&ctx.currentTime>=d.startedAt&&ctx.currentTime>=o.startedAt) syncPhase(d,o,false);
     else if(d.bend&&!d.hold) changeRate(d,()=>d.bend=0); });
 }
 function pause(d){ if(d.qtplay){ clearTimeout(d.qtplay); d.qtplay=null; $('play'+d.i).classList.remove('wait'); } clearTimeout(d.qthot); if(!d.playing) return; d.offset=pos(d); stopSrc(d); d.playing=false; uiTransport(d); }
@@ -907,9 +913,9 @@ function parseAnlz(ab){
           e+=elt||56; } }
       else if(tag==='PCO2'){ const n=dv.getUint16(p+16); let e=p+lh;
         for(let k=0;k<n&&e+32<=p+lt;k++){ if(fourcc(dv,e)!=='PCP2') break; const elt=dv.getUint32(e+8), hot=dv.getUint32(e+12), ty=dv.getUint8(e+16), tm=dv.getUint32(e+20), lp=dv.getUint32(e+24);
-          let color=null;
-          if(elt>=0x30){ const lc=dv.getUint32(e+0x28), cp=e+0x2c+lc; if(cp+4<=e+elt){ const r=dv.getUint8(cp+1),g=dv.getUint8(cp+2),b=dv.getUint8(cp+3); if(r|g|b) color='rgb('+r+','+g+','+b+')'; } }
-          const c={t:tm/1000,loop:ty===2&&lp!==0xffffffff&&lp>tm?(lp-tm)/1000:null,color};
+          let color=null, name='';
+          if(elt>=0x30){ const lc=dv.getUint32(e+0x28), cp=e+0x2c+lc; if(lc>1&&e+0x2c+lc<=e+elt) name=utf16be(dv,e+0x2c,lc); if(cp+4<=e+elt){ const r=dv.getUint8(cp+1),g=dv.getUint8(cp+2),b=dv.getUint8(cp+3); if(r|g|b) color='rgb('+r+','+g+','+b+')'; } }
+          const c={t:tm/1000,loop:ty===2&&lp!==0xffffffff&&lp>tm?(lp-tm)/1000:null,color,name};
           if(hot>0) out.hot.push(Object.assign(c,{slot:hot-1,ext:true})); else out.mem.push(c);
           e+=elt||64; } }
     }catch(err){}
@@ -1207,7 +1213,7 @@ async function readAna(tr){
   const a={beats:null,hot:[],mem:[]};
   for(const f of [tr.anlz,tr.ext]){ if(!f) continue; try{ const r=parseAnlz(await f.arrayBuffer()); if(r.beats) a.beats=r.beats;
     r.hot.forEach(h=>{ const ex=a.hot.findIndex(x=>x.slot===h.slot); if(ex>=0){ if(h.ext) a.hot[ex]=h; } else a.hot.push(h); });
-    if(r.mem.length&&!a.mem.length) a.mem=r.mem; }catch(e){} }
+    if(r.mem.length&&(!a.mem.length||r.mem.some(m=>m.name))) a.mem=r.mem; }catch(e){} }   // .EXT memory cues carry names
   return a;
 }
 /* ================= deck loading ================= */
@@ -1226,7 +1232,7 @@ async function loadToDeck(i,tr){
       const a=tr.ana||await readAna(tr); if(tr.anlz||tr.ext) tr.ana=a;
       if(a.beats){ grid={t:a.beats.t,n:a.beats.n}; bpm=a.beats.bpm||bpm; }
       else { const est=estimateGrid(buf); if(est){ grid=est.grid; bpm=est.bpm; approx=true; } }
-      a.hot.forEach(h=>{ if(h.slot>=0&&h.slot<8) hot[h.slot]={t:h.t,loop:h.loop,color:h.color||HOTC[h.slot]}; });
+      a.hot.forEach(h=>{ if(h.slot>=0&&h.slot<8) hot[h.slot]={t:h.t,loop:h.loop,color:h.color||HOTC[h.slot],name:h.name||''}; });
       cue=a.mem.length?a.mem.sort((x,y)=>x.t-y.t)[0].t:(grid?grid.t[0]:0);
     }
     if(tok!==d.token) return;
@@ -1239,6 +1245,56 @@ async function loadToDeck(i,tr){
   }
 }
 
+/* ================= mix assist =================
+   MIX (on the next deck): the deck waits at its mix point and starts by itself exactly on the playing deck's next
+   phrase (1/4/8/16 bars), tempo-synced from the first beat. The start is scheduled on the audio clock, so a slow
+   touch screen never shifts it. Mix point: rekordbox hot cue named MIX, else memory cue named MIX, else the first
+   memory cue, else hot cue A. Nothing is written back to rekordbox. */
+let MIXBARS=8; try{ MIXBARS=+(localStorage.getItem('tdj.mixbars')||8)||8; }catch(e){}
+const isMix=c=>!!c&&/\bmix\b/i.test(c.name||'');
+function mixPoint(d){
+  const a=d.track&&d.track.ana;
+  const h=d.hot.find(isMix); if(h) return {t:h.t,src:'MIX 핫큐'};
+  const m=a&&a.mem&&a.mem.find(isMix); if(m) return {t:m.t,src:'MIX 메모리 큐'};
+  if(a&&a.mem&&a.mem.length) return {t:a.mem.reduce((x,y)=>y.t<x.t?y:x).t,src:'첫 메모리 큐'};
+  if(d.hot[0]) return {t:d.hot[0].t,src:'핫큐 A'};
+  return {t:d.grid?d.grid.t[0]:0,src:'곡 처음'};
+}
+function barsOf(g){ if(g.bar) return g.bar; const b=new Int32Array(g.t.length); let c=-1; for(let k=0;k<g.t.length;k++){ if(g.n[k]===1) c++; b[k]=Math.max(0,c); } g.bar=b; return b; }
+/* next beat of the playing deck that starts a phrase of MIXBARS bars, at least `lead` seconds away */
+function nextPhrase(o,lead){
+  const g=o.grid, p=pos(o), i=beatAt(o,p), bars=barsOf(g), r=rate(o);
+  for(let j=Math.max(0,i+1);j<g.t.length;j++){ if(g.n[j]!==1||bars[j]%MIXBARS) continue; const dt=(g.t[j]-p)/r; if(dt>=lead) return {j,dt}; }
+  return null;
+}
+function mixCancel(d){ if(!d.mix) return; d.mix=null; uiMixBtn(d); }
+function mixArm(d){
+  if(d.mix){ mixCancel(d); return; }
+  const o=decks[1-d.i]; if(!d.buffer) return; ensureCtx();
+  const mp=mixPoint(d); let off=mp.t; if(d.q&&d.grid) off=snap(d,off);
+  if(!o.playing||!o.grid||!d.grid){ pause(d); seek(d,off); d.mixMsg=!o.playing?'상대 덱을 먼저 틀어 주세요':'비트그리드가 없어요'; uiMixBtn(d); setTimeout(()=>{ d.mixMsg=''; uiMixBtn(d); },1800); return; }
+  d.mix={off,src:mp.src};
+  if(!d.sync){ d.sync=true; if(o.sync){ o.sync=false; changeRate(o,()=>o.bend=0); } uiSync(); }
+  syncTempo(d,o); uiMixBtn(d);
+}
+/* every frame: follow the playing deck (it may speed up, loop or jump) and hand the start to the audio clock in time */
+function mixTick(){
+  decks.forEach(d=>{ if(!d.mix) return; const o=decks[1-d.i];
+    if(!o.playing||!o.grid||!d.buffer){ mixCancel(d); return; }
+    const nx=nextPhrase(o,.05); if(!nx){ d.mixMsg='곡 끝까지 남은 마디가 없어요'; mixCancel(d); setTimeout(()=>{ d.mixMsg=''; uiMixBtn(d); },1800); return; }
+    const bl=beatLen(o,nx.j)/rate(o); d.mix.left=Math.ceil(nx.dt/(bl*4)-1e-3);
+    if(nx.dt<.3&&!d.mix.at){
+      const T=ctx.currentTime+nx.dt; syncTempo(d,o); d.bend=0;
+      if(d.src){ d.src.onended=null; try{ d.src.stop(T); }catch(e){} d.src=null; }
+      d.loopOn=false; uiLoop(d); d.offset=d.mix.off; startSrc(d,T); uiTransport(d);
+      if(d.track) d.track.played=true;
+      d.mix=null; d.mixMsg='시작!'; setTimeout(()=>{ d.mixMsg=''; uiMixBtn(d); },1500);
+    }
+    uiMixBtn(d); });
+}
+function uiMixBtn(d){ const b=$('mix'+d.i); if(!b) return;
+  const t=d.mixMsg||(d.mix?'MIX · '+(d.mix.left||'…')+'마디':'MIX');
+  if(b.textContent!==t) b.textContent=t; b.classList.toggle('wait',!!d.mix); b.classList.toggle('on',d.mixMsg==='시작!'); }
 /* ================= UI helpers ================= */
 const fmt=s=>{ s=Math.max(0,s); const m=Math.floor(s/60); return m+':'+String(Math.floor(s%60)).padStart(2,'0'); };
 function flash(el){ if(!el) return; el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),160); }
@@ -1351,7 +1407,8 @@ decks.forEach((d,i)=>{
     if(d.sync&&o.bpm){ const np=clamp((1+o.pitch)*(1+v)/(1+d.pitch)-1,-PR,PR); changeRate(o,()=>o.pitch=Math.abs(np)<.002?0:np); uiPitch(o); return; }
     changeRate(d,()=>d.pitch=Math.abs(v)<.002?0:v); uiPitch(d); }});
 
-  tap($('play'+i),()=>{ d.playing?pause(d):play(d); });
+  tap($('play'+i),()=>{ if(d.mix) mixCancel(d); d.playing?pause(d):play(d); });
+  tap($('mix'+i),()=>mixArm(d));
   tap($('cue'+i),()=>{ if(!d.buffer) return; ensureCtx(); if(d.playing){ pause(d); seek(d,d.cue); } else { d.cue=snap(d,pos(d)); d.ver++; } flash($('cue'+i)); });
   /* Beat sync: this deck follows the other deck's tempo and stays phase-locked until switched off */
   tap($('sync'+i),()=>{
@@ -1717,6 +1774,7 @@ const ndot=$('ndot'), needle=$('needle'); let needleW=0, nState='', lastClock=''
 function frame(){
   fN++;
   if(HPref) HPref.tick();
+  mixTick();
   syncStep();
   decks.forEach((d,i)=>{
     const E=els[i], vp=vpos(d), p=pos(d);
@@ -1750,6 +1808,9 @@ function uiPerf(){ const b=$('perfBtn'); b.classList.toggle('on',LITE); b.textCo
 $('perfBtn').addEventListener('click',()=>{ LITE=!LITE; try{localStorage.setItem('tdj.lite',LITE?'1':'0');}catch(e){} uiPerf(); });
 const LATS=[0,50,100,150,200,250,300,400];
 $('latSeg').innerHTML=LATS.map(v=>'<button data-v="'+v+'">'+v+'</button>').join('');
+function uiMB(){ $('mbSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.v===MIXBARS)); }
+$('mbSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; MIXBARS=+b.dataset.v; try{ localStorage.setItem('tdj.mixbars',MIXBARS); }catch(err){} uiMB(); });
+uiMB();
 function uiLat(){ $('latSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.v===VLAT)); }
 $('latSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; VLAT=+b.dataset.v; try{localStorage.setItem('tdj.vlat',String(VLAT));}catch(e){} uiLat(); });
 function closeSettings(){ $('sett').hidden=true; $('setBtn').classList.remove('on'); }
@@ -1869,7 +1930,7 @@ const HP=(()=>{
   function snap(i){ const d=decks[i]; let at,T;
     const ts=ctx&&ctx.getOutputTimestamp?ctx.getOutputTimestamp():null;
     if(ts&&ts.performanceTime){ at=ts.performanceTime; T=ts.contextTime; } else { at=performance.now(); T=ctx?ctx.currentTime-(ctx.outputLatency||0):0; }
-    return {t:'st',deck:i,id:files[i],at:at+VLAT,p:posAt(d,T),r:rate(d),pl:d.playing&&!!d.buffer,lp:d.loopOn?[d.lin,d.lout]:null,wr:d.wrap,dur:d.dur}; }
+    return {t:'st',deck:i,id:files[i],at:at+VLAT,p:posAt(d,T),r:rate(d),pl:d.playing&&!!d.buffer&&!(ctx&&T<d.startedAt),lp:d.loopOn?[d.lin,d.lout]:null,wr:d.wrap,dur:d.dur}; }
   function tick(){
     if(state!=='on'||!open()) return; const now=performance.now();
     decks.forEach((d,i)=>{ const s=snap(i), L=last[i];
