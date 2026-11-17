@@ -451,15 +451,30 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 .ctl .hc.wait,.ctl .tbtn.sync.wait{box-shadow:inset 0 0 0 2px var(--loopln)}
 .ctl .tbtn.cue.wait,.ctl .tbtn.play.wait{box-shadow:0 0 0 1px rgba(255,255,255,.06),0 0 0 4px #0b0c0e,0 0 0 6px var(--loopln)}
 .ctl .sett{background:#121316}
+/* learn: tutorial + practice coach overlay */
+.coach{position:absolute;inset:0;pointer-events:none;z-index:60}
+.cring{position:absolute;border:3px solid var(--loopln);border-radius:14px;box-shadow:0 0 0 4px rgba(255,224,102,.18);animation:cpulse 1.4s ease-in-out infinite;will-change:opacity}
+@keyframes cpulse{50%{opacity:.35}}
+.cbub{position:absolute;width:440px;pointer-events:auto;background:var(--panel2);border:1px solid var(--loopln);border-radius:16px;padding:14px 16px 14px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.cbub.good{border-color:var(--ok)} .cbub.hint{border-color:var(--hot);width:400px}
+.cbh{display:flex;align-items:center;gap:10px}
+.cbh b{font-size:19px;flex:1} .cbub.good .cbh b{color:var(--ok)} .cbub.hint .cbh b{color:var(--hot)}
+.cbh span{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+.cbh button{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
+.cbub p{margin:8px 0 0;font-size:16px;line-height:1.5;word-break:keep-all}
+.cbb{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.cbb button{height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-weight:600;font-size:15px}
+.cbb button.pri{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 </style>
 
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v25</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v26</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
+    <button class="hb" id="learnBtn">배우기</button>
     <button class="hb" id="setBtn">설정</button>
     <button class="hb" id="openLib">탐색</button>
     <label class="hb pri" id="usbBtn" for="pickDir">USB 불러오기</label>
@@ -1991,10 +2006,141 @@ STORE.setAuto(STORE.auto); STORE.restore();
 decks.forEach(d=>{ uiPitch(d); uiTransport(d); uiHot(d); });
 buildViews();
 demoTracks.forEach((t,i)=>{ $('name'+i).textContent='데모 트랙 만드는 중…'; });
-Promise.all(demoSpecs.map(renderDemo)).then(bufs=>{ bufs.forEach((b,k)=>demoBufs[k]=b); demoTracks.forEach((t,i)=>loadToDeck(i,t)); })
+Promise.all(demoSpecs.map(renderDemo)).then(bufs=>{ bufs.forEach((b,k)=>demoBufs[k]=b); demoTracks.forEach((t,i)=>loadToDeck(i,t)); setTimeout(()=>COACH.welcome(),600); })
   .catch(()=>decks.forEach(d=>{ $('name'+d.i).textContent='탐색에서 곡을 불러오세요'; }));
 requestAnimationFrame(frame);
-window.__dj={parsePdb,parseAnlz,ingest,lib:()=>lib,decks};
+/* ================= learn: guided tutorial + practice coach =================
+   Tutorial: a first mix with the two demo songs. Each step lights up the control to use; moving controls
+   (crossfader, LOW) are shown once by the app, then the step waits until the user has done it.
+   Practice coach: afterwards, while mixing freely, a small hint appears only when something needs attention
+   (basslines clashing, tempos apart, a song about to end, silence). Overlay only: rings and a bubble that are
+   positioned once per step, so it adds no work to the frame loop. */
+const COACH=(()=>{
+  const ov=document.createElement('div'); ov.className='coach';
+  ov.innerHTML='<div id="cRings"></div><div class="cbub" id="cBub" hidden><div class="cbh"><b id="cTitle"></b><span id="cNum"></span><button id="cX" aria-label="닫기">✕</button></div><p id="cText"></p><div class="cbb" id="cBtns"></div></div>';
+  $('stage').appendChild(ov);
+  let tut=-1, busy=false, check=null, practice=false, hint=null, snooze={}, savedBars=null, lastPlay=0, clashT=0, outT=0;
+  try{ practice=localStorage.getItem('tdj.coach')==='1'; }catch(e){}
+  const stg=$('stage');
+  const lowEl=i=>document.body.classList.contains('digital')?$('tb'+i+'2'):$('k'+i+'low');
+  function rectOf(el){ const r=el.getBoundingClientRect(), s=stg.getBoundingClientRect(); return {x:(r.left-s.left)/S,y:(r.top-s.top)/S,w:r.width/S,h:r.height/S}; }
+  function show(o){   // o: {title,num,text,targets:[el],btns:[{t,fn,pri}],kind}
+    const rings=$('cRings'); rings.innerHTML=''; const els=(o.targets||[]).filter(e=>e&&e.offsetParent!==null);
+    let U=null;
+    els.forEach(e=>{ const r=rectOf(e), d=document.createElement('div'); d.className='cring';
+      d.style.cssText='left:'+(r.x-6)+'px;top:'+(r.y-6)+'px;width:'+(r.w+12)+'px;height:'+(r.h+12)+'px'; rings.appendChild(d);
+      U=U?{x:Math.min(U.x,r.x),y:Math.min(U.y,r.y),r:Math.max(U.r,r.x+r.w),b:Math.max(U.b,r.y+r.h)}:{x:r.x,y:r.y,r:r.x+r.w,b:r.y+r.h}; });
+    const b=$('cBub'); b.hidden=false; b.className='cbub'+(o.kind?' '+o.kind:'');
+    $('cTitle').textContent=o.title||''; $('cNum').textContent=o.num||''; $('cText').textContent=o.text||'';
+    const bt=$('cBtns'); bt.innerHTML=''; (o.btns||[]).forEach(x=>{ const e=document.createElement('button'); e.textContent=x.t; if(x.pri) e.className='pri'; e.addEventListener('click',x.fn); bt.appendChild(e); });
+    bt.hidden=!(o.btns&&o.btns.length);
+    const W=440, H=b.offsetHeight;
+    if(!U){ b.style.left=(800-W/2)+'px'; b.style.top=(450-H/2)+'px'; return; }
+    const cx=(U.x+U.r)/2, below=(U.y+U.b)/2<430;
+    b.style.left=clamp(cx-W/2,16,1600-W-16)+'px';
+    b.style.top=clamp(below?U.b+18:U.y-H-18,12,900-H-12)+'px';
+  }
+  function hide(){ $('cBub').hidden=true; $('cRings').innerHTML=''; }
+  $('cX').addEventListener('click',()=>{ if(tut>=0) stop(); else if(hint){ snooze[hint]=performance.now()+60000; hint=null; hide(); } });
+  /* moves a control the way a hand would, so the user can see what to do */
+  function glide(get,set,to,ms){ return new Promise(r=>{ const from=get(), t0=performance.now();
+    const f=now=>{ const k=Math.min(1,(now-t0)/ms), e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2; set(from+(to-from)*e); if(k<1) requestAnimationFrame(f); else r(); }; requestAnimationFrame(f); }); }
+  const setXf=v=>{ mix.xf=v; $('xf').style.setProperty('--v',v); applyMix(); };
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  const bpm=i=>decks[i].bpm?Math.round(decks[i].bpm*(1+decks[i].pitch)):'?';
+  const STEPS=[
+    {title:'배우기',text:'디제잉은 한 곡에서 다음 곡으로 끊기지 않게 넘어가는 거예요. 데모 곡 두 개로 첫 믹스를 해 볼게요. 5분이면 돼요.',btn:'시작하기'},
+    {title:'첫 곡 틀기',targets:()=>[$('play0')],text:'왼쪽 덱 A의 ▶를 눌러 첫 곡을 틀어요.',done:()=>decks[0].playing},
+    {title:'박자 보기',targets:()=>[$('wv0')],text:'가운데 파형의 하얀 선이 지금 재생 위치, 빨간 선은 한 마디(4박)의 시작이에요. 쿵 하는 킥 소리가 빨간 선에 맞춰 지나가요.',btn:'알겠어요'},
+    {title:'크로스페이더',targets:()=>[$('xf')],text:'아래 크로스페이더는 두 곡의 비율이에요. 왼쪽 끝이면 A만, 오른쪽 끝이면 B만 들려요. 지금은 A쪽이라 관객에게는 A만 들려요.',
+      demo:async()=>{ await glide(()=>mix.xf,setXf,.5,900); await wait(400); await glide(()=>mix.xf,setXf,0,700); },btn:'알겠어요'},
+    {title:'속도 맞추기',targets:()=>[$('sync1')],text:()=>'다음 곡 B는 '+bpm(1)+' BPM, 지금 곡 A는 '+bpm(0)+' BPM이라 속도가 달라요. B의 SYNC를 누르면 B가 A의 속도와 박자에 맞춰져요.',done:()=>decks[1].sync},
+    {title:'베이스 미리 빼기',targets:()=>[lowEl(1)],text:'베이스(LOW)가 두 곡에서 동시에 나오면 소리가 뭉개져요. 들어올 곡 B의 LOW를 끝까지 내려 둬요. (먼저 보여 드릴게요)',
+      demo:async()=>{ await glide(()=>mix.eq[1][2],v=>setEq(1,2,v),-1,800); await wait(400); await glide(()=>mix.eq[1][2],v=>setEq(1,2,v),0,500); },
+      done:()=>mix.eq[1][2]<=-.6||mix.kill[1][2]},
+    {title:'타이밍 맞춰 시작',targets:()=>[$('mix1')],text:'B의 MIX를 눌러요. A의 다음 마디 첫 박에 맞춰 B가 알아서 시작돼요. 박자에 맞춰 누를 필요가 없어요.',done:()=>decks[1].playing&&ctx&&ctx.currentTime>=decks[1].startedAt},
+    {title:'두 곡 섞기',targets:()=>[$('xf')],text:'크로스페이더를 가운데까지 천천히 밀어요. 이제 두 곡이 같이 들려요. 박자가 딱 맞죠?',
+      demo:async()=>{ await glide(()=>mix.xf,setXf,.5,1100); await wait(300); await glide(()=>mix.xf,setXf,0,600); },done:()=>mix.xf>=.4},
+    {title:'베이스 바꾸기',targets:()=>[lowEl(0),lowEl(1)],text:'믹싱의 핵심이에요. 빨간 선(마디 시작)에 맞춰 A의 LOW는 내리고 B의 LOW는 올려요. 베이스가 B로 넘어가요.',
+      demo:async()=>{ const a=mix.eq[0][2], b=mix.eq[1][2]; await glide(()=>0,v=>{ setEq(0,2,a+(-1-a)*v); setEq(1,2,b+(0-b)*v); },1,900); await wait(500); await glide(()=>1,v=>{ setEq(0,2,a+(-1-a)*v); setEq(1,2,b+(0-b)*v); },0,600); },
+      done:()=>mix.eq[0][2]<=-.6&&mix.eq[1][2]>=-.2&&!mix.kill[1][2]},
+    {title:'A 빼기',targets:()=>[$('xf')],text:'크로스페이더를 오른쪽 끝까지 밀어 A를 빼요.',done:()=>mix.xf>=.95},
+    {title:'첫 믹스 완성!',text:'A에서 B로 끊김 없이 넘어왔어요. 실제로는 이제 A를 멈추고(▶) 그 덱에 다음 곡을 올려서 같은 방법으로 계속 이어가요.',btn:'보너스 보기',kind:'good'},
+    {title:'보너스 ① 핫큐',targets:()=>[document.querySelector('#hots1 .hc[data-k="0"]')],text:'핫큐는 곡의 특정 지점을 저장해 두고 바로 점프하는 버튼이에요. B의 A 패드를 눌러 보세요.',btn:'다음'},
+    {title:'보너스 ② 루프',targets:()=>[document.querySelector('#loops1 .lp[data-n="4"]')],text:'4를 누르면 4박이 계속 반복돼요. 곡을 늘리거나 분위기를 끌어올릴 때 써요. 한 번 더 누르면 풀려요.',done:()=>decks[1].loopOn},
+    {title:'보너스 ③ FX',targets:()=>[$('fxClap')],text:'환호를 눌러 분위기를 띄워 보세요. 위의 FX 보낼 곳으로 어느 덱에 걸지 고를 수 있어요.',btn:'다음'},
+    {title:'끝! 이제 연습해요',text:'연습 코치가 켜져요. 직접 믹스할 때 베이스가 겹치거나, 속도가 다르거나, 곡이 곧 끝날 때 여기서 힌트를 드려요. 끄려면 위쪽 배우기 버튼을 누르세요.',btn:'연습 시작',kind:'good'}
+  ];
+  async function prep(){
+    $('lib').hidden=true; if(!$('sett').hidden) closeSettings(); ensureCtx();
+    for(let i=0;i<2;i++){ const d=decks[i]; if(d.track!==demoTracks[i]) await loadToDeck(i,demoTracks[i]); }
+    decks.forEach((d,i)=>{ if(d.mix) mixCancel(d); pause(d); if(d.loopOn) exitLoop(d); seek(d,0); d.sync=false; changeRate(d,()=>{ d.pitch=0; d.bend=0; }); uiPitch(d);
+      for(let j=0;j<3;j++){ mix.eq[i][j]=0; mix.kill[i][j]=false; } mix.filt[i]=0; mix.vol[i]=.85; uiMix(i); });
+    uiSync(); setXf(0);
+    if(savedBars==null){ savedBars=MIXBARS; MIXBARS=1; }
+  }
+  async function go(k){
+    tut=k; check=null; const s=STEPS[k]; if(!s){ finish(); return; }
+    const text=typeof s.text==='function'?s.text():s.text, num=k?k+' / '+(STEPS.length-1):'';
+    const btns=[];
+    if(s.btn) btns.push({t:s.btn,pri:true,fn:()=>{ if(k===STEPS.length-1) finish(); else if(k===0) prep().then(()=>go(1)); else go(k+1); }});
+    if(s.demo) btns.unshift({t:'다시 보기',fn:()=>runDemo(s)});
+    if(k===10) btns.unshift({t:'여기서 끝내기',fn:finish});
+    show({title:s.title,num,text,targets:s.targets?s.targets():[],btns,kind:s.kind});
+    if(s.demo) await runDemo(s);
+    if(s.done&&tut===k) check=s.done;
+  }
+  async function runDemo(s){ if(busy) return; busy=true; const c=check; check=null; try{ await s.demo(); }catch(e){} busy=false; if(STEPS[tut]===s&&s.done) check=c||s.done; }
+  function stop(){ tut=-1; check=null; hide(); if(savedBars!=null){ MIXBARS=savedBars; savedBars=null; } }
+  function finish(){ stop(); setPractice(true); }
+  function start(){ hint=null; go(0); }
+  setInterval(()=>{   // tutorial progress and practice hints, checked a few times a second
+    if(tut>=0){ if(check&&!busy&&check()){ const k=tut; check=null; $('cBub').classList.add('good'); $('cTitle').textContent='좋아요!'; setTimeout(()=>{ if(tut===k) go(k+1); },700); } return; }
+    if(practice) coach();
+  },250);
+  /* ---------- practice coach ---------- */
+  const gainOf=i=>{ const x=mix.xf; return i?(x>=.5?1:Math.cos((.5-x)*Math.PI)):(x<=.5?1:Math.cos((x-.5)*Math.PI)); };
+  const heard=i=>decks[i].playing&&mix.vol[i]>.15&&gainOf(i)>.3;
+  const left=d=>d.loopOn||d.wrap?1e9:(d.dur-pos(d))/rate(d);
+  function rule(){
+    const now=performance.now(), [A,B]=decks;
+    if(A.playing||B.playing) lastPlay=now;
+    const both=heard(0)&&heard(1);
+    if(!A.playing&&!B.playing&&now-lastPlay<15000&&lastPlay) return {k:'silence',t:'음악이 멈췄어요',x:'덱의 ▶로 다음 곡을 틀어요. 음악이 끊기지 않게 하는 게 디제잉의 기본이에요.',el:[$('play0'),$('play1')].filter((e,i)=>decks[i].buffer)};
+    for(const i of [0,1]){ const d=decks[i], o=decks[1-i];
+      if(d.playing&&!o.playing&&mix.vol[i]>.15&&gainOf(i)<.3) return {k:'xf'+i,t:'소리가 안 나가요',x:'크로스페이더가 반대쪽에 있어서 덱 '+LET[i]+' 소리가 안 들려요. 크로스페이더를 '+(i?'오른쪽':'왼쪽')+'으로 밀어요.',el:[$('xf')]}; }
+    if(both&&!A.sync&&!B.sync&&A.bpm&&B.bpm){ const r=(A.bpm*(1+A.pitch))/(B.bpm*(1+B.pitch)); if(Math.abs(r-1)>.01&&Math.abs(r-2)>.02&&Math.abs(r-.5)>.01){ const n=mix.vol[0]*gainOf(0)<mix.vol[1]*gainOf(1)?0:1;
+      return {k:'tempo',t:'속도가 달라요',x:'두 곡의 BPM이 달라서 박자가 엇갈려요. 들어오는 덱 '+LET[n]+'의 SYNC를 눌러 맞춰요.',el:[$('sync'+n)]}; } }
+    const lowUp=i=>mix.eq[i][2]>-.35&&!mix.kill[i][2];
+    if(both&&lowUp(0)&&lowUp(1)){ if(!clashT) clashT=now; if(now-clashT>1500) return {k:'bass',t:'베이스가 겹쳐요',x:'두 곡의 LOW가 모두 올라가 있어서 저음이 뭉개져요. 마디가 바뀔 때 한쪽 LOW를 내려요.',el:[lowEl(0),lowEl(1)]}; } else clashT=0;
+    for(const i of [0,1]){ const d=decks[i], o=decks[1-i];
+      if(heard(i)&&left(d)<30&&!heard(1-i)){
+        if(!o.buffer) return {k:'next'+i,t:'곧 곡이 끝나요',x:'덱 '+LET[i]+'가 30초 안에 끝나요. 탐색에서 다음 곡을 덱 '+LET[1-i]+'에 올려요.',el:[$('openLib')]};
+        if(!o.playing&&!o.mix) return {k:'prep'+i,t:'곧 곡이 끝나요',x:'덱 '+LET[1-i]+'의 SYNC를 켜고 MIX를 눌러 두면 다음 마디에 맞춰 알아서 시작해요.',el:[$('sync'+(1-i)),$('mix'+(1-i))]}; } }
+    for(const i of [0,1]){ const d=decks[i], o=decks[1-i];
+      if(d.playing&&!heard(i)&&heard(1-i)&&(mix.xf<.05||mix.xf>.95)){ if(!outT) outT=now; if(now-outT>10000) return {k:'stop'+i,t:'나간 곡 정리',x:'덱 '+LET[i]+'는 이제 들리지 않아요. ▶로 멈추고 다음 곡을 올려 두면 이어서 믹스할 수 있어요.',el:[$('play'+i)]}; return null; } }
+    outT=0; return null;
+  }
+  function coach(){
+    const r=rule(), now=performance.now();
+    if(r&&(snooze[r.k]||0)<now){ if(hint!==r.k){ hint=r.k; show({title:r.t,text:r.x,targets:r.el,kind:'hint'}); } }
+    else if(hint&&(!r||r.k!==hint)){ hint=null; hide(); }
+  }
+  function setPractice(on){ practice=on; try{ localStorage.setItem('tdj.coach',on?'1':'0'); }catch(e){} if(!on){ hint=null; hide(); } $('learnBtn').classList.toggle('on',on); }
+  function menu(){
+    if(tut>=0){ stop(); return; }
+    show({title:'배우기',text:'디제잉이 처음이면 튜토리얼로 첫 믹스를 따라 해 보세요. 연습 코치는 직접 믹스할 때 필요한 순간에만 힌트를 띄워요.',
+      btns:[{t:practice?'연습 코치 끄기':'연습 코치 켜기',fn:()=>{ setPractice(!practice); hide(); }},{t:'튜토리얼 시작',pri:true,fn:start}]});
+  }
+  $('learnBtn').addEventListener('click',menu);
+  $('learnBtn').classList.toggle('on',practice);
+  /* first visit: offer the tutorial once */
+  function welcome(){ let seen=false; try{ seen=!!localStorage.getItem('tdj.learn'); localStorage.setItem('tdj.learn','1'); }catch(e){} if(seen) return;
+    show({title:'처음이세요?',text:'디제잉을 몰라도 괜찮아요. 데모 곡으로 5분 만에 첫 믹스를 따라 해 볼래요?',btns:[{t:'괜찮아요',fn:hide},{t:'배워 볼래요',pri:true,fn:start}]}); }
+  return {start,stop,welcome,get active(){ return tut>=0; }};
+})();
+
+window.__dj={parsePdb,parseAnlz,ingest,lib:()=>lib,decks,mix,applyMix,COACH};
 })();
 </script>
 
