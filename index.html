@@ -116,7 +116,7 @@ label.hb{display:inline-flex;align-items:center;justify-content:center;cursor:po
 .jog.bend .rsvg .rbg{stroke:var(--cd)}
 /* the record: grooves are painted once into a canvas, the light reflection is a fixed overlay,
    and only the paper label in the middle rotates */
-.vinyl{position:absolute;inset:4.6%;border-radius:50%;overflow:hidden;background:#09080c;box-shadow:0 0 0 1px #000}
+.vinyl{position:absolute;inset:9%;border-radius:50%;overflow:hidden;background:#09080c;box-shadow:0 0 0 1px #000}
 .vc{position:absolute;inset:0;width:100%;height:100%;display:block}
 .sheen{position:absolute;inset:0;border-radius:50%;pointer-events:none;
   background:conic-gradient(from 205deg,rgba(255,255,255,0) 0deg,rgba(255,255,255,.12) 20deg,rgba(255,255,255,0) 44deg,rgba(255,255,255,0) 180deg,rgba(255,255,255,.08) 200deg,rgba(255,255,255,0) 224deg,rgba(255,255,255,0) 360deg)}
@@ -383,15 +383,15 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 .ctl .vinyl,.ctl .arm{display:none}
 .ctl .ring{background:repeating-conic-gradient(rgba(255,255,255,.07) 0 .6deg,rgba(0,0,0,.18) .6deg 1.2deg),conic-gradient(from 210deg,#2b2d32,#4a4d54,#2a2c31,#1f2125,#3c3f45,#2b2d32,#1e2024,#45484f,#2b2d32);
   box-shadow:0 18px 40px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.06)}
-.ctl .ring::before{content:"";position:absolute;inset:18px;border-radius:50%;background:#0b0c0e}
-.ctl .rsvg{inset:19px;width:calc(100% - 38px);height:calc(100% - 38px)}
+.ctl .ring::before{content:"";position:absolute;inset:36px;border-radius:50%;background:#0b0c0e}
+.ctl .rsvg{inset:37px;width:calc(100% - 74px);height:calc(100% - 74px)}
 .ctl .rsvg circle{stroke-width:.9} .ctl .rsvg .rbg{stroke:#1c1e22}
-.ctl .cjog{display:block;position:absolute;inset:25px;border-radius:50%;pointer-events:none;
+.ctl .cjog{display:block;position:absolute;inset:44px;border-radius:50%;pointer-events:none;
   background:radial-gradient(circle,transparent 0 30%,rgba(255,255,255,.03) 30.4%,transparent 31.2%),repeating-radial-gradient(circle,#101114 0 1.5px,#15161a 1.5px 3px),#121316;
   box-shadow:inset 0 2px 0 rgba(255,255,255,.04),inset 0 -12px 30px rgba(0,0,0,.6)}
 .ctl .cjog::before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 300deg,transparent,rgba(255,255,255,.05) 20deg,transparent 60deg,transparent 180deg,rgba(255,255,255,.035) 200deg,transparent 240deg)}
 .ctl .jog.scr .cjog{box-shadow:0 0 0 3px var(--c),inset 0 -12px 30px rgba(0,0,0,.6)}
-.cmk{position:absolute;left:calc(50% - 1.5px);top:6px;width:3px;height:30px;border-radius:2px;background:#e9ebee;transform-origin:1.5px 193px;will-change:transform}
+.cmk{position:absolute;left:calc(50% - 1.5px);top:6px;width:3px;height:30px;border-radius:2px;background:#e9ebee;transform-origin:1.5px 174px;will-change:transform}
 .cdisp{position:absolute;left:50%;top:50%;width:168px;height:168px;margin:-84px 0 0 -84px;border-radius:50%;background:#050607;contain:layout paint;
   box-shadow:0 0 0 1px rgba(255,255,255,.07),0 0 0 6px #0c0d10,0 0 0 7px rgba(255,255,255,.05);display:flex;flex-direction:column;align-items:center;justify-content:center}
 .cdisp .cdk{font-size:9px;font-weight:700;letter-spacing:.2em;color:var(--t3)}
@@ -470,7 +470,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v26</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v27</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -543,6 +543,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const JOGEDGE=.78, BENDGAIN=4.5;   // outer jog band (fraction of radius) that nudges tempo, and how hard a turn pushes
 const LET=['A','B'], ROT=1.8, PR=.12, WR=150, DEC_SR=32000;
 const HOTC=['#ff6b6b','#ffa94d','#ffe066','#69db7c','#4fe3d6','#5c9dff','#b197fc','#f783ac'];
 const AUDIO_EXT=/\.(mp3|m4a|aac|mp4|wav|aif|aiff|flac|ogg|opus)$/i;
@@ -1470,7 +1471,7 @@ decks.forEach((d,i)=>{
   jog.addEventListener('pointerdown',e=>{
     e.preventDefault(); if(!d.buffer) return; ensureCtx(); try{jog.setPointerCapture(e.pointerId);}catch(_){}
     const r=jog.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2, dist=Math.hypot(e.clientX-cx,e.clientY-cy)/(r.width/2);
-    js={cx,cy,a:Math.atan2(e.clientY-cy,e.clientX-cx),t:performance.now(),g:0,mode:dist>.88?'bend':'scr',was:d.playing,id:e.pointerId}; d.hold=true;
+    js={cx,cy,a:Math.atan2(e.clientY-cy,e.clientX-cx),t:performance.now(),g:0,mode:dist>JOGEDGE?'bend':'scr',was:d.playing,id:e.pointerId}; d.hold=true;
     if(js.mode==='scr'){ pause(d); jog.classList.add('scr'); } else jog.classList.add('bend');
   });
   jog.addEventListener('pointermove',e=>{
@@ -1479,7 +1480,7 @@ decks.forEach((d,i)=>{
     if(da>Math.PI) da-=2*Math.PI; if(da<-Math.PI) da+=2*Math.PI;
     const now=performance.now(), dt=Math.max(8,now-js.t); js.t=now;
     if(js.mode==='scr'){ const ds=da/(2*Math.PI)*ROT; seek(d,d.offset+ds); if(now-js.g>40&&Math.abs(ds)>.0005){ js.g=now; grain(d,d.offset,ds/(dt/1000)); } }
-    else if(d.playing){ changeRate(d,()=>d.bend=clamp(da*2.2/(dt/16),-.25,.25)); clearTimeout(bendT); bendT=setTimeout(()=>changeRate(d,()=>d.bend=0),90); }
+    else if(d.playing){ changeRate(d,()=>d.bend=clamp(da*BENDGAIN/(dt/16),-.35,.35)); clearTimeout(bendT); bendT=setTimeout(()=>changeRate(d,()=>d.bend=0),150); }
   });
   const end=e=>{ if(!js||e.pointerId!==js.id) return; d.hold=false; if(js.mode==='scr'&&js.was) play(d,true); if(js.mode==='bend'){ clearTimeout(bendT); changeRate(d,()=>d.bend=0); } jog.classList.remove('scr','bend'); js=null; };
   jog.addEventListener('pointerup',end); jog.addEventListener('pointercancel',end);
