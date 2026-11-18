@@ -465,12 +465,18 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 .cbb{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 .cbb button{height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-weight:600;font-size:15px}
 .cbb button.pri{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.tt{position:fixed;inset:0;z-index:100;background:rgba(5,6,8,.55);touch-action:none}
+.tt canvas{position:absolute;inset:0;width:100%;height:100%}
+.ttp{position:absolute;left:50%;top:12px;transform:translateX(-50%);width:min(560px,92vw);background:#17181c;border:1px solid #3a3d44;border-radius:14px;padding:12px 14px;color:#e9ebee;font-size:14px;line-height:1.45}
+.ttp p{margin:6px 0;white-space:pre-line} .ttb{display:flex;gap:8px;justify-content:flex-end}
+.ttb button{height:40px;padding:0 16px;border-radius:10px;border:1px solid #3a3d44;background:#22242a;color:#e9ebee;font-weight:600}
+.ttb button.pri{background:#e9ebee;color:#111}
 </style>
 
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v28</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v29</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -489,6 +495,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
     <div class="srow col"><div class="hph"><div><b>TV에 저장</b><span>덱에 올린 곡과 렉박 목록을 TV에 저장해서, 앱을 나갔다 와도 USB를 다시 고르지 않고 바로 써요. 공간이 모자라면 오래 안 쓴 곡부터 지워요.</span></div><button class="hb on" id="autoSave">켜짐</button></div>
       <span id="stInfo" style="margin-top:8px">확인 중…</span><div style="display:flex;gap:8px;margin-top:8px"><button class="hb" id="stClear">저장된 곡·목록 모두 지우기</button></div></div>
     <div class="srow"><div><b>터치하면 전체화면</b><span>화면을 터치하면 전체화면으로 바꿔서 주소창이 내려오지 않게 해요. 리모컨 뒤로가기로 빠져나와도 다음 터치에 다시 전체화면이 돼요.</span></div><button class="hb" id="afsBtn">켜짐</button></div>
+    <div class="srow"><div><b>터치 점검</b><span>두 손가락을 같이 쓸 때 화면이 터치를 어떻게 알아듣는지 그려서 보여 줘요. 조작이 엉뚱하게 움직일 때 원인을 찾는 데 써요.</span></div><button class="hb" id="ttBtn">열기</button></div>
     <div class="srow"><div><b>턴테이블 관성</b><span>플래터를 돌리다 놓으면 판이 그 속도로 계속 돌다가 모터 힘으로 재생 속도로 돌아와요. 뒤로 던지면 백스핀이 돼요. 끄면 놓는 즉시 재생돼요.</span></div><button class="hb" id="inBtn">켜짐</button></div>
     <div class="srow"><div><b>가벼운 모드</b><span>파형 해상도를 낮춰 TV에서 더 부드럽게 움직여요. 스탠바이미에서는 처음부터 켜져 있어요.</span></div><button class="hb" id="perfBtn">켜짐</button></div>
     <div class="srow col"><div><b>사용 안내</b><span>처음 쓰는 방법, 렉박 USB 준비, 자주 묻는 질문: y2kjang-sudo.github.io/Touch-DJ/guide.html</span></div></div>
@@ -2228,6 +2235,37 @@ const COACH=(()=>{
     show({title:'처음이세요?',text:'디제잉을 몰라도 괜찮아요. 데모 곡으로 5분 만에 첫 믹스를 따라 해 볼래요?',btns:[{t:'괜찮아요',fn:hide},{t:'배워 볼래요',pri:true,fn:start}]}); }
   return {start,stop,welcome,get active(){ return tut>=0; }};
 })();
+
+/* ================= touch check: shows exactly what the screen reports ================= */
+const TTEST=(()=>{
+  const ov=document.createElement('div'); ov.className='tt'; ov.hidden=true;
+  ov.innerHTML='<canvas id="ttc"></canvas><div class="ttp"><b>터치 점검</b><p>두 손가락으로 평소처럼 해 보세요. 예: 오른손으로 B 볼륨을 올리면서 왼손으로 A의 LOW를 내리기. 손가락마다 색이 다른 점과 선이 그려져요.</p><p id="ttr">아직 터치가 없어요.</p><div class="ttb"><button id="ttClr">지우기</button><button class="pri" id="ttEnd">끝내기</button></div></div>';
+  document.body.appendChild(ov);
+  const cv=ov.querySelector('#ttc'), g=cv.getContext('2d'), COL=['#ff5a5a','#4dc3ff','#7be36b','#ffd84d','#d68bff','#ff9a3d'];
+  let P=new Map(), n=0, maxSim=0, jumps=0, ghost=0, notes=[], raf=0;
+  function size(){ cv.width=innerWidth*devicePixelRatio; cv.height=innerHeight*devicePixelRatio; g.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
+  function report(){
+    $('ttr').textContent='지금까지 손가락 '+n+'번 · 동시에 최대 '+maxSim+'개 인식 · 순간이동 '+jumps+'번 · 유령 터치 의심 '+ghost+'번'+(notes.length?'\n'+notes.slice(-4).join('\n'):'');
+  }
+  function dot(x,y,c,r){ g.fillStyle=c; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); }
+  ov.addEventListener('pointerdown',e=>{ if(e.target.closest('.ttp')) return; e.preventDefault(); try{ov.setPointerCapture(e.pointerId);}catch(_){}
+    const c=COL[n%COL.length], k=++n;
+    // a new touch exactly level with (or exactly above) another finger, appearing where nothing was, is the typical ghost point
+    for(const q of P.values()){ if(Math.abs(q.y-e.clientY)<12||Math.abs(q.x-e.clientX)<12){ ghost++; notes.push('점 '+k+'이(가) 점 '+q.k+'와 같은 '+(Math.abs(q.y-e.clientY)<12?'높이':'세로줄')+'에 생겼어요 (유령일 수 있어요)'); break; } }
+    P.set(e.pointerId,{k,c,x:e.clientX,y:e.clientY,t:performance.now()}); maxSim=Math.max(maxSim,P.size);
+    dot(e.clientX,e.clientY,c,16); g.fillStyle='#fff'; g.font='bold 14px sans-serif'; g.fillText(String(k),e.clientX+18,e.clientY-14); report(); });
+  ov.addEventListener('pointermove',e=>{ const q=P.get(e.pointerId); if(!q) return; const now=performance.now(), j=Math.hypot(e.clientX-q.x,e.clientY-q.y);
+    if(j>80&&now-q.t<60){ jumps++; notes.push('점 '+q.k+'이(가) '+Math.round(j)+'px 순간이동했어요'); g.setLineDash([4,6]); } 
+    g.strokeStyle=q.c; g.lineWidth=4; g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(e.clientX,e.clientY); g.stroke(); g.setLineDash([]);
+    q.x=e.clientX; q.y=e.clientY; q.t=now; report(); });
+  const up=e=>{ const q=P.get(e.pointerId); if(!q) return; dot(q.x,q.y,q.c,8); P.delete(e.pointerId); };
+  ov.addEventListener('pointerup',up); ov.addEventListener('pointercancel',e=>{ const q=P.get(e.pointerId); if(q) notes.push('점 '+q.k+'이(가) 중간에 끊겼어요'); up(e); report(); });
+  function clear(){ g.clearRect(0,0,cv.width,cv.height); P.clear(); n=0; maxSim=0; jumps=0; ghost=0; notes=[]; report(); }
+  ov.querySelector('#ttClr').addEventListener('click',clear);
+  ov.querySelector('#ttEnd').addEventListener('click',()=>{ ov.hidden=true; });
+  return {open(){ closeSettings(); size(); clear(); ov.hidden=false; }};
+})();
+$('ttBtn').addEventListener('click',()=>TTEST.open());
 
 window.__dj={parsePdb,parseAnlz,ingest,lib:()=>lib,decks,mix,applyMix,COACH,VINYL};
 })();
