@@ -476,7 +476,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v29</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v30</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -1482,16 +1482,28 @@ function tap(el,fn){ el.addEventListener('pointerdown',e=>{ if(e.button>0) retur
    - each control follows only the finger that grabbed it (pointerId), never jumps to the touch point
    - a single move event that leaps implausibly far is treated as touch-panel noise and ignored
    - the reset gesture is two quick taps without movement, so short repeated drags never reset */
+/* The StanbyMe panel often drops a finger for a moment and reports it again as a new touch, and it tracks two
+   touches at most. A new touch that appears right where a drag just broke off continues that drag (same control,
+   no dead zone, no double-tap reset) instead of grabbing whatever control is under it. */
+const STITCH={ms:220,px:70}; let dragEnds=[];
+document.addEventListener('pointerdown',e=>{
+  const now=performance.now(); dragEnds=dragEnds.filter(r=>now-r.t<STITCH.ms);
+  let best=null, bd=STITCH.px*S;
+  for(const r of dragEnds){ const dd=Math.hypot(e.clientX-r.x,e.clientY-r.y); if(dd<bd){ bd=dd; best=r; } }
+  if(!best||!best.resume(e)) return;
+  dragEnds=dragEnds.filter(r=>r!==best); e.stopPropagation(); e.preventDefault();
+},{capture:true});
 function bindDrag(el,o){
   let act=null, lastTap=0;
-  el.addEventListener('pointerdown',e=>{
-    e.preventDefault(); ensureCtx();
-    if(act) return;
+  function begin(e,cont){
+    if(act) return false;
     try{el.setPointerCapture(e.pointerId);}catch(_){}
     const r=el.getBoundingClientRect(), th=(o.thumb||30)*S, span=o.max-o.min;
     const scale=o.abs?Math.max(20,(o.axis==='x'?r.width:r.height)-th):o.px*S;
-    act={id:e.pointerId,x:e.clientX,y:e.clientY,v:o.get(),t:performance.now(),lx:e.clientX,ly:e.clientY,lt:performance.now(),moved:false,scale,span};
-  });
+    act={id:e.pointerId,x:e.clientX,y:e.clientY,v:o.get(),t:performance.now(),lx:e.clientX,ly:e.clientY,lt:performance.now(),moved:!!cont,cont:!!cont,scale,span};
+    return true;
+  }
+  el.addEventListener('pointerdown',e=>{ e.preventDefault(); ensureCtx(); begin(e,false); });
   el.addEventListener('pointermove',ev=>{
     if(!act||ev.pointerId!==act.id) return;
     const now=performance.now(), jump=Math.hypot(ev.clientX-act.lx,ev.clientY-act.ly);
@@ -1504,9 +1516,10 @@ function bindDrag(el,o){
   });
   const end=ev=>{
     if(!act||ev.pointerId!==act.id) return;
-    const now=performance.now(), tap=!act.moved&&now-act.t<260;
+    const now=performance.now(), tap=!act.moved&&!act.cont&&now-act.t<260;
     if(tap&&o.reset!==undefined&&now-lastTap<380){ o.set(o.reset); lastTap=0; }
     else lastTap=tap?now:0;
+    if(act.moved||now-act.t>250) dragEnds.push({x:act.lx,y:act.ly,t:now,resume:ev2=>begin(ev2,true)});
     act=null;
   };
   el.addEventListener('pointerup',end); el.addEventListener('pointercancel',end); el.addEventListener('lostpointercapture',end);
@@ -2242,25 +2255,26 @@ const TTEST=(()=>{
   ov.innerHTML='<canvas id="ttc"></canvas><div class="ttp"><b>터치 점검</b><p>두 손가락으로 평소처럼 해 보세요. 예: 오른손으로 B 볼륨을 올리면서 왼손으로 A의 LOW를 내리기. 손가락마다 색이 다른 점과 선이 그려져요.</p><p id="ttr">아직 터치가 없어요.</p><div class="ttb"><button id="ttClr">지우기</button><button class="pri" id="ttEnd">끝내기</button></div></div>';
   document.body.appendChild(ov);
   const cv=ov.querySelector('#ttc'), g=cv.getContext('2d'), COL=['#ff5a5a','#4dc3ff','#7be36b','#ffd84d','#d68bff','#ff9a3d'];
-  let P=new Map(), n=0, maxSim=0, jumps=0, ghost=0, notes=[], raf=0;
+  let P=new Map(), n=0, maxSim=0, jumps=0, ghost=0, breaks=0, ups=[], notes=[], raf=0;
   function size(){ cv.width=innerWidth*devicePixelRatio; cv.height=innerHeight*devicePixelRatio; g.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
   function report(){
-    $('ttr').textContent='지금까지 손가락 '+n+'번 · 동시에 최대 '+maxSim+'개 인식 · 순간이동 '+jumps+'번 · 유령 터치 의심 '+ghost+'번'+(notes.length?'\n'+notes.slice(-4).join('\n'):'');
+    $('ttr').textContent='지금까지 손가락 '+n+'번 · 동시에 최대 '+maxSim+'개 인식 · 끊겼다 다시 잡힘 '+breaks+'번 (앱이 이어 붙여요) · 순간이동 '+jumps+'번'+(notes.length?'\n'+notes.slice(-4).join('\n'):'');
   }
   function dot(x,y,c,r){ g.fillStyle=c; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); }
   ov.addEventListener('pointerdown',e=>{ if(e.target.closest('.ttp')) return; e.preventDefault(); try{ov.setPointerCapture(e.pointerId);}catch(_){}
-    const c=COL[n%COL.length], k=++n;
+    const c=COL[n%COL.length], k=++n, tn=performance.now(); ups=ups.filter(u=>tn-u.t<220);
+    const br=ups.find(u=>Math.hypot(u.x-e.clientX,u.y-e.clientY)<70*S); if(br){ breaks++; ups=ups.filter(u=>u!==br); }
     // a new touch exactly level with (or exactly above) another finger, appearing where nothing was, is the typical ghost point
-    for(const q of P.values()){ if(Math.abs(q.y-e.clientY)<12||Math.abs(q.x-e.clientX)<12){ ghost++; notes.push('점 '+k+'이(가) 점 '+q.k+'와 같은 '+(Math.abs(q.y-e.clientY)<12?'높이':'세로줄')+'에 생겼어요 (유령일 수 있어요)'); break; } }
+    if(!br) for(const q of P.values()){ if(Math.abs(q.y-e.clientY)<12||Math.abs(q.x-e.clientX)<12){ ghost++; notes.push('점 '+k+'이(가) 점 '+q.k+'와 같은 '+(Math.abs(q.y-e.clientY)<12?'높이':'세로줄')+'에 생겼어요 (유령일 수 있어요)'); break; } }
     P.set(e.pointerId,{k,c,x:e.clientX,y:e.clientY,t:performance.now()}); maxSim=Math.max(maxSim,P.size);
     dot(e.clientX,e.clientY,c,16); g.fillStyle='#fff'; g.font='bold 14px sans-serif'; g.fillText(String(k),e.clientX+18,e.clientY-14); report(); });
   ov.addEventListener('pointermove',e=>{ const q=P.get(e.pointerId); if(!q) return; const now=performance.now(), j=Math.hypot(e.clientX-q.x,e.clientY-q.y);
     if(j>80&&now-q.t<60){ jumps++; notes.push('점 '+q.k+'이(가) '+Math.round(j)+'px 순간이동했어요'); g.setLineDash([4,6]); } 
     g.strokeStyle=q.c; g.lineWidth=4; g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(e.clientX,e.clientY); g.stroke(); g.setLineDash([]);
     q.x=e.clientX; q.y=e.clientY; q.t=now; report(); });
-  const up=e=>{ const q=P.get(e.pointerId); if(!q) return; dot(q.x,q.y,q.c,8); P.delete(e.pointerId); };
+  const up=e=>{ const q=P.get(e.pointerId); if(!q) return; dot(q.x,q.y,q.c,8); ups.push({x:q.x,y:q.y,t:performance.now()}); P.delete(e.pointerId); };
   ov.addEventListener('pointerup',up); ov.addEventListener('pointercancel',e=>{ const q=P.get(e.pointerId); if(q) notes.push('점 '+q.k+'이(가) 중간에 끊겼어요'); up(e); report(); });
-  function clear(){ g.clearRect(0,0,cv.width,cv.height); P.clear(); n=0; maxSim=0; jumps=0; ghost=0; notes=[]; report(); }
+  function clear(){ g.clearRect(0,0,cv.width,cv.height); P.clear(); n=0; maxSim=0; jumps=0; ghost=0; breaks=0; ups=[]; notes=[]; report(); }
   ov.querySelector('#ttClr').addEventListener('click',clear);
   ov.querySelector('#ttEnd').addEventListener('click',()=>{ ov.hidden=true; });
   return {open(){ closeSettings(); size(); clear(); ov.hidden=false; }};
