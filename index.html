@@ -470,7 +470,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v27</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v28</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -489,6 +489,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
     <div class="srow col"><div class="hph"><div><b>TV에 저장</b><span>덱에 올린 곡과 렉박 목록을 TV에 저장해서, 앱을 나갔다 와도 USB를 다시 고르지 않고 바로 써요. 공간이 모자라면 오래 안 쓴 곡부터 지워요.</span></div><button class="hb on" id="autoSave">켜짐</button></div>
       <span id="stInfo" style="margin-top:8px">확인 중…</span><div style="display:flex;gap:8px;margin-top:8px"><button class="hb" id="stClear">저장된 곡·목록 모두 지우기</button></div></div>
     <div class="srow"><div><b>터치하면 전체화면</b><span>화면을 터치하면 전체화면으로 바꿔서 주소창이 내려오지 않게 해요. 리모컨 뒤로가기로 빠져나와도 다음 터치에 다시 전체화면이 돼요.</span></div><button class="hb" id="afsBtn">켜짐</button></div>
+    <div class="srow"><div><b>턴테이블 관성</b><span>플래터를 돌리다 놓으면 판이 그 속도로 계속 돌다가 모터 힘으로 재생 속도로 돌아와요. 뒤로 던지면 백스핀이 돼요. 끄면 놓는 즉시 재생돼요.</span></div><button class="hb" id="inBtn">켜짐</button></div>
     <div class="srow"><div><b>가벼운 모드</b><span>파형 해상도를 낮춰 TV에서 더 부드럽게 움직여요. 스탠바이미에서는 처음부터 켜져 있어요.</span></div><button class="hb" id="perfBtn">켜짐</button></div>
     <div class="srow col"><div><b>사용 안내</b><span>처음 쓰는 방법, 렉박 USB 준비, 자주 묻는 질문: y2kjang-sudo.github.io/Touch-DJ/guide.html</span></div></div>
     <div class="srow col"><div><b>기기 정보</b><span id="uaInfo"></span></div></div>
@@ -678,7 +679,7 @@ function ensureCtx(){
   const fb=ctx.createGain(), ef=ctx.createBiquadFilter(); fb.gain.value=.5; ef.type='highpass'; ef.frequency.value=350;
   echoDelay.connect(ef); ef.connect(fb); fb.connect(echoDelay); ef.connect(comp);
   noiseBuf=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate); const nd=noiseBuf.getChannelData(0); for(let k=0;k<nd.length;k++) nd[k]=Math.random()*2-1;
-  decks.forEach(buildChain); applyMix();
+  decks.forEach(buildChain); applyMix(); vinylInit();
   return ctx;
 }
 function buildChain(d){
@@ -744,7 +745,7 @@ function qRun(ref,key,fn,el){
   ref['qt'+key]=setTimeout(()=>{ if(el) el.classList.remove('wait'); fn(ref.playing?lateness(ref):0); },Math.max(0,wait-3));
 }
 function play(d,now){
-  if(!d.buffer) return; ensureCtx(); if(!d.wrap&&!d.loopOn&&d.offset>=d.dur-.05) d.offset=0;
+  if(!d.buffer) return; ensureCtx(); vinylKill(d); if(!d.wrap&&!d.loopOn&&d.offset>=d.dur-.05) d.offset=0;
   const o=decks[1-d.i];
   if(!now&&!d.playing&&!d.sync&&d.q&&d.grid&&o.playing&&o.grid){
     // start on the other deck's next beat, from a beat of this track
@@ -780,14 +781,97 @@ function syncStep(){
     if(d.playing&&o.playing&&!d.hold&&ctx.currentTime>=d.startedAt&&ctx.currentTime>=o.startedAt) syncPhase(d,o,false);
     else if(d.bend&&!d.hold) changeRate(d,()=>d.bend=0); });
 }
-function pause(d){ if(d.qtplay){ clearTimeout(d.qtplay); d.qtplay=null; $('play'+d.i).classList.remove('wait'); } clearTimeout(d.qthot); if(!d.playing) return; d.offset=pos(d); stopSrc(d); d.playing=false; uiTransport(d); }
+function pause(d){ vinylKill(d); if(d.qtplay){ clearTimeout(d.qtplay); d.qtplay=null; $('play'+d.i).classList.remove('wait'); } clearTimeout(d.qthot); if(!d.playing) return; d.offset=pos(d); stopSrc(d); d.playing=false; uiTransport(d); }
 function seek(d,t){
-  if(!d.buffer) return;
+  if(!d.buffer) return; vinylKill(d);
   t=d.wrap?((t%d.dur)+d.dur)%d.dur:clamp(t,0,d.dur-.01);
   if(d.loopOn&&(t<d.lin||t>=d.lout)){ d.loopOn=false; uiLoop(d); }
   if(d.playing){ stopSrc(d); d.offset=t; startSrc(d); } else d.offset=t;
 }
 function changeRate(d,fn){ rebase(d); fn(); if(d.playing&&d.src) d.src.playbackRate.setValueAtTime(rate(d),ctx.currentTime); }
+/* ---- vinyl engine: scratch and platter inertia ----
+   A small AudioWorklet reads the track like a needle: the hand sets where the record is, a critically damped spring
+   follows it sample by sample (so slow TV touch events still give a continuous, gliding sound, backwards included),
+   and after release the platter keeps its speed while the motor pulls it back to play speed (or friction stops it).
+   Only a window of about ±10 s around the hand is copied to the audio thread. Without AudioWorklet the old grain
+   scratch is used. */
+const SCR_SRC=`class S extends AudioWorkletProcessor{
+constructor(){super();this.L=null;this.R=null;this.ws=0;this.bs=32000;this.n=0;this.wrap=false;this.dur=1e9;
+this.mode=0;this.p=0;this.v=0;this.tg=0;this.fv=0;this.tm=0;this.r=0;this.acc=3;this.fr=1.5;this.stopAt=-1;this.cnt=0;this.done=false;
+this.port.onmessage=e=>{const m=e.data;
+if(m.t==='win'){this.L=m.L;this.R=m.R;this.ws=m.ws;this.bs=m.sr;this.n=m.L.length;this.wrap=m.wrap;this.dur=m.dur;}
+else if(m.t==='grab'){if(this.mode===0){this.p=m.p;this.v=m.v;}this.tg=this.p;this.fv=0;this.tm=currentTime;this.mode=1;this.stopAt=-1;this.done=false;}
+else if(m.t==='move'){this.tg+=m.dp;this.fv=m.fv;this.tm=currentTime;}
+else if(m.t==='free'){this.mode=2;this.r=m.r;this.acc=m.acc;this.fr=m.fr;this.done=false;}
+else if(m.t==='stopAt'){this.stopAt=m.at;}
+else if(m.t==='off'){this.mode=0;}};}
+rd(c,x){const n=this.n;let i=Math.floor(x);const f=x-i;let a,b,d,e;
+if(this.wrap){a=c[((i-1)%n+n)%n];b=c[((i%n)+n)%n];d=c[((i+1)%n+n)%n];e=c[((i+2)%n+n)%n];}
+else{if(i<1||i>n-3)return 0;a=c[i-1];b=c[i];d=c[i+1];e=c[i+2];}
+const c1=.5*(d-a),c2=a-2.5*b+2*d-.5*e,c3=.5*(e-a)+1.5*(b-d);return((c3*f+c2)*f+c1)*f+b;}
+process(_,outs){const o=outs[0],A=o[0],B=o[1]||o[0],N=A.length;
+if(this.mode===0||!this.L){A.fill(0);if(B!==A)B.fill(0);return true;}
+const dt=1/sampleRate,w=70,w2=w*w;
+for(let i=0;i<N;i++){const t=currentTime+i*dt;
+if(this.stopAt>=0&&t>=this.stopAt){this.mode=0;for(;i<N;i++){A[i]=0;B[i]=0;}break;}
+if(this.mode===1){const ex=Math.min(t-this.tm,.06)*this.fv;this.v+=(w2*(this.tg+ex-this.p)-2*w*this.v)*dt;}
+else{const d=this.r-this.v,s=(this.r===0?this.fr:this.acc)*dt;this.v=Math.abs(d)<=s?this.r:this.v+(d>0?s:-s);
+if(!this.done&&this.v===this.r){this.done=true;this.port.postMessage({t:'done',p:this.p,ct:t,v:this.v});}}
+if(this.v>8)this.v=8;else if(this.v<-8)this.v=-8;
+this.p+=this.v*dt;if(!this.wrap&&this.p<-.5){this.p=-.5;if(this.v<0)this.v=0;}
+const x=(this.p-this.ws)*this.bs;A[i]=this.rd(this.L,x);B[i]=this.R===this.L?A[i]:this.rd(this.R,x);}
+if(++this.cnt%6===0)this.port.postMessage({t:'p',p:this.p,v:this.v});return true;}}
+registerProcessor('tdj-scr',S);`;
+const VINYL={ok:false,trying:false,inertia:true,ACC:3,FR:6,WIN:10};   // ACC: motor pull (×speed per s), FR: slow-down when the deck is stopped
+try{ VINYL.inertia=localStorage.getItem('tdj.inertia')!=='0'; }catch(e){}
+async function vinylInit(){
+  if(VINYL.ok||VINYL.trying||!ctx||!ctx.audioWorklet||typeof AudioWorkletNode==='undefined') return; VINYL.trying=true;
+  const urls=[]; try{ urls.push(URL.createObjectURL(new Blob([SCR_SRC],{type:'application/javascript'}))); }catch(e){}
+  urls.push('data:application/javascript;charset=utf-8,'+encodeURIComponent(SCR_SRC));
+  for(const u of urls){ try{ await ctx.audioWorklet.addModule(u);
+      decks.forEach(d=>{ const n=new AudioWorkletNode(ctx,'tdj-scr',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[2]});
+        n.connect(d.nodes.lo); n.port.onmessage=e=>vinMsg(d,e.data); d.vn=n; d.vw=null; });
+      VINYL.ok=true; break; }catch(e){ console.warn('scratch engine',e); } }
+  VINYL.trying=false;
+}
+const wrapPos=(d,p)=>d.wrap?((p%d.dur)+d.dur)%d.dur:clamp(p,0,d.dur);
+function vinMsg(d,m){
+  if(!d.vin) return;
+  if(m.t==='p'){ d.offset=wrapPos(d,m.p); return; }
+  if(m.t==='done'){
+    if(d.hold) return;
+    if(m.v>0){   // back at play speed: hand over to the normal player on the exact same sample
+      const at=ctx.currentTime+.03; d.vin=false;
+      d.offset=clamp(wrapPos(d,m.p+(at-m.ct)*m.v),0,d.dur-.01);
+      if(d.loopOn&&(d.offset<d.lin||d.offset>=d.lout)){ d.loopOn=false; uiLoop(d); }
+      if(!d.wrap&&d.offset>=d.dur-.05){ d.vn.port.postMessage({t:'off'}); uiTransport(d); return; }
+      startSrc(d,at); d.vn.port.postMessage({t:'stopAt',at}); uiTransport(d);
+    } else { d.vin=false; d.offset=clamp(wrapPos(d,m.p),0,d.dur-.01); d.vn.port.postMessage({t:'off'}); uiTransport(d); }
+  }
+}
+function vinylKill(d){ if(d.vin){ d.vin=false; if(d.vn) d.vn.port.postMessage({t:'off'}); } }
+function vinylWindow(d){
+  const p=d.offset, w=d.vw;
+  if(w&&w.buf===d.buffer&&(w.whole||(p-w.ws>VINYL.WIN/2&&w.we-p>VINYL.WIN/2))) return;
+  const b=d.buffer, sr=b.sampleRate, whole=d.wrap||d.dur<=VINYL.WIN*2.5;
+  const s0=whole?0:Math.max(0,Math.floor((p-VINYL.WIN)*sr)), s1=whole?b.length:Math.min(b.length,Math.ceil((p+VINYL.WIN)*sr));
+  const L=b.getChannelData(0).slice(s0,s1), R=b.numberOfChannels>1?b.getChannelData(1).slice(s0,s1):null;
+  d.vn.port.postMessage({t:'win',L,R:R||L,ws:s0/sr,sr,wrap:!!d.wrap,dur:d.dur},R?[L.buffer,R.buffer]:[L.buffer]);
+  d.vw={buf:b,ws:s0/sr,we:s1/sr,whole};
+}
+/* hand on the record: stops it under the finger (keeps a spinning platter's own motion) */
+function vinylGrab(d){
+  let v=0; const spinning=d.vin;
+  if(!spinning&&d.playing){ v=rate(d); d.offset=pos(d); }
+  pause(d); if(spinning) d.vin=true;
+  vinylWindow(d);
+  d.vn.port.postMessage({t:'grab',p:d.offset,v}); d.vin=true;
+}
+function vinylMove(d,dp,fv){ d.vn.port.postMessage({t:'move',dp,fv}); }
+function vinylRelease(d,motor){
+  if(!VINYL.inertia){ vinylKill(d); if(motor) play(d,true); return; }
+  d.vn.port.postMessage({t:'free',r:motor?rate(d):0,acc:VINYL.ACC,fr:VINYL.FR});
+}
 
 /* ---- beat grid helpers ---- */
 function beatAt(d,t){ const g=d.grid&&d.grid.t; if(!g||!g.length||t<g[0]) return -1; let lo=0,hi=g.length-1; while(lo<hi){const m=(lo+hi+1)>>1; if(g[m]<=t) lo=m; else hi=m-1;} return lo; }
@@ -1240,7 +1324,7 @@ async function readAna(tr){
 /* ================= deck loading ================= */
 async function loadToDeck(i,tr){
   const d=decks[i]; if(!tr) return; if(tr.src!=='demo'&&!tr.file) return;
-  const tok=++d.token; pause(d); stopSrc(d); d.loopOn=false;
+  const tok=++d.token; pause(d); stopSrc(d); d.vw=null; d.loopOn=false;
   $('name'+i).textContent='불러오는 중… '+tr.title; $('art'+i).textContent=tr.artist||'';
   try{
     let buf,grid=null,bpm=tr.bpm,approx=false,hot=Array(8).fill(null),cue=0,wrap=false;
@@ -1471,18 +1555,20 @@ decks.forEach((d,i)=>{
   jog.addEventListener('pointerdown',e=>{
     e.preventDefault(); if(!d.buffer) return; ensureCtx(); try{jog.setPointerCapture(e.pointerId);}catch(_){}
     const r=jog.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2, dist=Math.hypot(e.clientX-cx,e.clientY-cy)/(r.width/2);
-    js={cx,cy,a:Math.atan2(e.clientY-cy,e.clientX-cx),t:performance.now(),g:0,mode:dist>JOGEDGE?'bend':'scr',was:d.playing,id:e.pointerId}; d.hold=true;
-    if(js.mode==='scr'){ pause(d); jog.classList.add('scr'); } else jog.classList.add('bend');
+    const vin=VINYL.ok&&d.vn, motor=d.playing||(d.vin&&d.vinMotor);
+    js={cx,cy,a:Math.atan2(e.clientY-cy,e.clientX-cx),t:performance.now(),g:0,mode:dist>JOGEDGE&&d.playing?'bend':'scr',was:motor,vin,fv:0,lm:0,id:e.pointerId}; d.hold=true;
+    if(js.mode==='scr'){ if(vin) vinylGrab(d); else pause(d); jog.classList.add('scr'); } else jog.classList.add('bend');
   });
   jog.addEventListener('pointermove',e=>{
     if(!js||e.pointerId!==js.id) return;
     const a=Math.atan2(e.clientY-js.cy,e.clientX-js.cx); let da=a-js.a; js.a=a;
     if(da>Math.PI) da-=2*Math.PI; if(da<-Math.PI) da+=2*Math.PI;
     const now=performance.now(), dt=Math.max(8,now-js.t); js.t=now;
-    if(js.mode==='scr'){ const ds=da/(2*Math.PI)*ROT; seek(d,d.offset+ds); if(now-js.g>40&&Math.abs(ds)>.0005){ js.g=now; grain(d,d.offset,ds/(dt/1000)); } }
+    if(js.mode==='scr'&&js.vin){ const ds=da/(2*Math.PI)*ROT; js.fv=js.fv*.4+ds/(dt/1000)*.6; js.lm=now; vinylMove(d,ds,js.fv); }
+    else if(js.mode==='scr'){ const ds=da/(2*Math.PI)*ROT; seek(d,d.offset+ds); if(now-js.g>40&&Math.abs(ds)>.0005){ js.g=now; grain(d,d.offset,ds/(dt/1000)); } }
     else if(d.playing){ changeRate(d,()=>d.bend=clamp(da*BENDGAIN/(dt/16),-.35,.35)); clearTimeout(bendT); bendT=setTimeout(()=>changeRate(d,()=>d.bend=0),150); }
   });
-  const end=e=>{ if(!js||e.pointerId!==js.id) return; d.hold=false; if(js.mode==='scr'&&js.was) play(d,true); if(js.mode==='bend'){ clearTimeout(bendT); changeRate(d,()=>d.bend=0); } jog.classList.remove('scr','bend'); js=null; };
+  const end=e=>{ if(!js||e.pointerId!==js.id) return; d.hold=false; if(js.mode==='scr'&&js.vin){ d.vinMotor=js.was; vinylRelease(d,js.was); } else if(js.mode==='scr'&&js.was) play(d,true); if(js.mode==='bend'){ clearTimeout(bendT); changeRate(d,()=>d.bend=0); } jog.classList.remove('scr','bend'); js=null; };
   jog.addEventListener('pointerup',end); jog.addEventListener('pointercancel',end);
 
   /* detail waveform: drag to scrub; overview: tap to jump */
@@ -1841,6 +1927,8 @@ function frame(){
 
 /* ---- settings: light mode & Bluetooth delay ---- */
 function uiPerf(){ const b=$('perfBtn'); b.classList.toggle('on',LITE); b.textContent=LITE?'켜짐':'꺼짐'; decks.forEach(d=>d.ver++); }
+function uiInertia(){ const e=$('inBtn'); e.classList.toggle('on',VINYL.inertia); e.textContent=VINYL.inertia?'켜짐':'꺼짐'; }
+$('inBtn').addEventListener('click',()=>{ VINYL.inertia=!VINYL.inertia; try{localStorage.setItem('tdj.inertia',VINYL.inertia?'1':'0');}catch(e){} uiInertia(); }); uiInertia();
 $('perfBtn').addEventListener('click',()=>{ LITE=!LITE; try{localStorage.setItem('tdj.lite',LITE?'1':'0');}catch(e){} uiPerf(); });
 const LATS=[0,50,100,150,200,250,300,400];
 $('latSeg').innerHTML=LATS.map(v=>'<button data-v="'+v+'">'+v+'</button>').join('');
@@ -2141,7 +2229,7 @@ const COACH=(()=>{
   return {start,stop,welcome,get active(){ return tut>=0; }};
 })();
 
-window.__dj={parsePdb,parseAnlz,ingest,lib:()=>lib,decks,mix,applyMix,COACH};
+window.__dj={parsePdb,parseAnlz,ingest,lib:()=>lib,decks,mix,applyMix,COACH,VINYL};
 })();
 </script>
 
