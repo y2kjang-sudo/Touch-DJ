@@ -476,7 +476,7 @@ html.ctl{--bg:#08090b;--panel:#121316;--panel2:#17181c;--panel3:#24262b;--line:r
 <div class="fit" id="fit">
 <div class="stage" id="stage">
   <header class="top">
-    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v31</small></div>
+    <div class="brand"><b>TOUCH</b> <i>DJ</i><small>v32</small></div>
     <div class="chip" id="chip"><i></i><span id="chipT">데모 트랙 2곡</span></div>
     <div class="grow"></div>
     <div class="clock" id="clock">--:--</div>
@@ -773,7 +773,7 @@ function syncTempo(d,o){ const np=tempoRatio(d,o)-1; if(Math.abs(np-d.pitch)>1e-
 function phaseErr(d,o){
   const po=pos(o), io=beatAt(o,po), p=pos(d), id=beatAt(d,p); if(io<0||id<0) return null;
   const fo=(po-o.grid.t[io])/beatLen(o,io), fd=(p-d.grid.t[id])/beatLen(d,id);
-  let df=fo-fd; df-=Math.round(df); return df*beatLen(d,id);
+  let df=fo-fd-(d.phRef||0); df-=Math.round(df); return df*beatLen(d,id);   // phRef: beat offset set by a cue MIX start, kept as the reference
 }
 function syncPhase(d,o,hard){
   if(!d.grid||!o.grid) return; const e=phaseErr(d,o); if(e==null) return;
@@ -1331,7 +1331,7 @@ async function readAna(tr){
 /* ================= deck loading ================= */
 async function loadToDeck(i,tr){
   const d=decks[i]; if(!tr) return; if(tr.src!=='demo'&&!tr.file) return;
-  const tok=++d.token; pause(d); stopSrc(d); d.vw=null; d.loopOn=false;
+  const tok=++d.token; pause(d); stopSrc(d); d.vw=null; d.phRef=0; d.loopOn=false;
   $('name'+i).textContent='불러오는 중… '+tr.title; $('art'+i).textContent=tr.artist||'';
   try{
     let buf,grid=null,bpm=tr.bpm,approx=false,hot=Array(8).fill(null),cue=0,wrap=false;
@@ -1407,8 +1407,8 @@ function mixTick(){
       if(dt<-.02||(o.loopOn&&d.mix.cue>=o.lout)) d.mix.cue=null;   // the playing deck jumped away from the cue
       else { const bl=(o.grid?beatLen(o,Math.max(0,beatAt(o,pos(o)))):60/(o.bpm||120))/rate(o); d.mix.left=Math.max(1,Math.ceil(dt/(bl*4)-1e-3));
         if(dt<.3){ const T=ctx.currentTime+Math.max(0,dt); syncTempo(d,o); d.bend=0;
-          let off=d.mix.off;
-          if(d.grid&&o.grid){ let sh=phaseAt(o,d.mix.cue)-phaseAt(d,off); sh-=Math.round(sh); off+=sh*beatLen(d,Math.max(0,beatAt(d,off))); if(off<0) off+=beatLen(d,0); }   // keep the beats lined up
+          const off=d.mix.off;   // the user's own cues are the truth: start exactly there, grids may be off
+          d.phRef=0; if(d.grid&&o.grid&&beatAt(o,d.mix.cue)>=0&&beatAt(d,off)>=0){ let r=phaseAt(o,d.mix.cue)-phaseAt(d,off); r-=Math.round(r); d.phRef=r; }   // SYNC keeps this relation instead of pulling to the grid
           if(d.src){ d.src.onended=null; try{ d.src.stop(T); }catch(e){} d.src=null; }
           d.loopOn=false; uiLoop(d); d.offset=off; startSrc(d,T); uiTransport(d);
           if(d.track) d.track.played=true;
@@ -1417,7 +1417,7 @@ function mixTick(){
     const nx=nextPhrase(o,.05); if(!nx){ d.mixMsg='곡 끝까지 남은 마디가 없어요'; mixCancel(d); setTimeout(()=>{ d.mixMsg=''; uiMixBtn(d); },1800); return; }
     const bl=beatLen(o,nx.j)/rate(o); d.mix.left=Math.ceil(nx.dt/(bl*4)-1e-3);
     if(nx.dt<.3&&!d.mix.at){
-      const T=ctx.currentTime+nx.dt; syncTempo(d,o); d.bend=0;
+      const T=ctx.currentTime+nx.dt; syncTempo(d,o); d.bend=0; d.phRef=0;
       if(d.src){ d.src.onended=null; try{ d.src.stop(T); }catch(e){} d.src=null; }
       d.loopOn=false; uiLoop(d); d.offset=d.mix.off; startSrc(d,T); uiTransport(d);
       if(d.track) d.track.played=true;
@@ -1571,7 +1571,7 @@ decks.forEach((d,i)=>{
     b.addEventListener('click',e=>{ if(e.detail===0) mixArm(d); }); }
   tap($('cue'+i),()=>{ if(!d.buffer) return; ensureCtx(); if(d.playing){ pause(d); seek(d,d.cue); } else { d.cue=snap(d,pos(d)); d.ver++; } flash($('cue'+i)); });
   /* Beat sync: this deck follows the other deck's tempo and stays phase-locked until switched off */
-  tap($('sync'+i),()=>{
+  tap($('sync'+i),()=>{ d.phRef=0;
     const o=decks[1-i]; ensureCtx();
     if(d.sync){ d.sync=false; changeRate(d,()=>d.bend=0); uiSync(); return; }
     if(!d.bpm||!o.bpm){ flash($('sync'+i)); return; }
