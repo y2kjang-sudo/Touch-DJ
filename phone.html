@@ -98,7 +98,14 @@ function applyHead(){
 
 /* ---------- clock: TV performance.now() = phone performance.now() + off ---------- */
 let offs=[];
-function clock(){ const b=[...offs].sort((a,c)=>a.rtt-c.rtt).slice(0,5); return b.length?{off:med(b.map(x=>x.off)),rtt:med(b.map(x=>x.rtt))}:null; }
+/* clock offset to the TV: the best (lowest round-trip) pings of the last 40 s give a target, and the value used
+   for playback moves toward it by at most 0.5 ms per ping, so Wi-Fi noise never shifts the music suddenly */
+let clk=null;
+function clockTarget(){ const b=[...offs].sort((a,c)=>a.rtt-c.rtt).slice(0,5); return b.length?{off:med(b.map(x=>x.off)),rtt:med(b.map(x=>x.rtt))}:null; }
+function clockUpdate(){ const t=clockTarget(); if(!t) return;
+  if(!clk||offs.length<12) clk={off:t.off,rtt:t.rtt};
+  else{ clk.off+=clamp(t.off-clk.off,-.5,.5); clk.rtt=t.rtt; } }
+function clock(){ return clk; }
 function perfOfCtx(T){ const ts=ctx.getOutputTimestamp?ctx.getOutputTimestamp():null;
   if(ts&&ts.performanceTime) return ts.performanceTime+(T-ts.contextTime)*1000;
   return performance.now()+(T-ctx.currentTime+(ctx.outputLatency||0)+(ctx.baseLatency||0))*1000; }
@@ -124,9 +131,13 @@ function follow(d){
   if(!d.src||key!==d.key){ restart(d,c); return; }
   const T=ctx.currentTime; let err=expect(d,perfOfCtx(T),c)-mine(d,T);
   if(s.lp){ const L=s.lp[1]-s.lp[0]; err-=Math.round(err/L)*L; } else if(s.wr&&s.dur){ err-=Math.round(err/s.dur)*s.dur; }
-  if(Math.abs(err)>.025){ if(performance.now()-d.lastRe>150) restart(d,c); return; }
-  // small drift: lean on the speed for half a second instead of jumping
-  const nr=s.r*(1+clamp(err/.5,-.02,.02)); if(Math.abs(nr-d.r)<1e-5) return;
+  // one late message or a busy moment on either device gives a single odd reading: judge by the median of the
+  // last five, restart (an audible cut) only for a real jump on the TV or an error that stays large
+  (d.errs=d.errs||[]).push(err); if(d.errs.length>5) d.errs.shift();
+  const me=med(d.errs);
+  if(Math.abs(err)>.3||(d.errs.length>=3&&Math.abs(me)>.06)){ if(performance.now()-d.lastRe>400){ d.res=(d.res||0)+1; log(LET[d.i]+' 다시 맞춤 '+(me>0?'+':'')+Math.round(me*1000)+'ms (총 '+d.res+'번)'); d.errs=[]; restart(d,c); } return; }
+  // small drift: lean on the speed instead of jumping
+  const nr=s.r*(1+clamp(me/.5,-.03,.03)); if(Math.abs(nr-d.r)<1e-5) return;
   d.o=mine(d,T); d.t0=T; d.r=nr; d.src.playbackRate.setValueAtTime(nr,T);
 }
 setInterval(()=>D.forEach(follow),60);
@@ -148,7 +159,7 @@ async function answer(sdp){
   pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
   pc.ondatachannel=e=>{ const ch=e.channel;
     log('채널 받음: '+ch.label);
-    if(ch.label==='ctl'){ dc=ch; dc.onopen=()=>{ st('ok','TV와 연결됐어요'); log('제어 채널 열림'); offs=[]; ping(); }; dc.onmessage=ev=>onCtl(JSON.parse(ev.data)); }
+    if(ch.label==='ctl'){ dc=ch; dc.onopen=()=>{ st('ok','TV와 연결됐어요'); log('제어 채널 열림'); offs=[]; clk=null; ping(); }; dc.onmessage=ev=>onCtl(JSON.parse(ev.data)); }
     else if(ch.label==='file'){ fc=ch; fc.binaryType='arraybuffer'; fc.onopen=()=>log('파일 채널 열림'); fc.onmessage=ev=>{ try{ onFile(ev.data); }catch(e){ log('파일 처리 오류: '+e.message); } }; } };
   pc.onconnectionstatechange=()=>{ const s=pc.connectionState;
     if(s==='failed'||s==='disconnected') st('bad','연결이 끊겼어요. \'다시 연결\'을 눌러 주세요'); else if(s==='connecting') st('wait','연결하는 중…'); };
@@ -160,7 +171,7 @@ async function answer(sdp){
 }
 function ping(){ if(!dc||dc.readyState!=='open') return; dc.send(JSON.stringify({t:'ping',a:performance.now()})); setTimeout(ping,offs.length<12?120:1000); }
 function onCtl(m){
-  if(m.t==='pong'){ const now=performance.now(), rtt=now-m.a; offs.push({off:m.b-(m.a+rtt/2),rtt}); if(offs.length>40) offs.shift(); }
+  if(m.t==='pong'){ const now=performance.now(), rtt=now-m.a; offs.push({off:m.b-(m.a+rtt/2),rtt}); if(offs.length>40) offs.shift(); clockUpdate(); }
   else if(m.t==='st'){ const d=D[m.deck]; d.s=m; follow(d);
     const now=performance.now();
     if(m.id&&m.id!==d.id&&!d.dec&&!(inc&&inc.deck===m.deck)){ if(!d.wait) d.wait=now; else if(now-d.wait>4000&&now-(d.asked||0)>8000){ d.asked=now; d.wait=0; log(LET[m.deck]+' 곡이 안 와서 다시 요청'); dc.send(JSON.stringify({t:'need',deck:m.deck})); } }
